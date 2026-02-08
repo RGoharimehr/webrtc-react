@@ -6,7 +6,7 @@ A modern, interactive web interface for controlling NVIDIA Omniverse using WebRT
 
 This application provides a comprehensive control panel for sending commands to Omniverse digital twins through WebRTC. It features real-time video streaming, interactive controls, command management, and status monitoring.
 
-![UI Preview](https://github.com/user-attachments/assets/2e4f1b64-1b26-45aa-9a80-dfd085bdf584)
+![UI Preview](https://github.com/user-attachments/assets/a69e9717-ef04-4a6d-a49f-b2d6d385c917)
 
 ## Quick Start
 
@@ -22,6 +22,8 @@ npm run build
 ```
 
 Visit [http://localhost:3000](http://localhost:3000) to see the application.
+
+**👀 Want to see how the UI looks?** Check out the [Viewing Guide](docs/VIEWING_GUIDE.md) for different ways to preview and test the interface!
 
 ## Features
 
@@ -62,7 +64,10 @@ Monitor real-time metrics:
 
 ## Documentation
 
-For detailed documentation, see [docs/README.md](docs/README.md)
+- 📖 [Full Documentation](docs/README.md) - Complete technical guide
+- 👀 [Viewing Guide](docs/VIEWING_GUIDE.md) - How to view and test the UI
+- 💻 [Usage Examples](docs/USAGE.md) - Integration and code examples
+- 🏗️ [Architecture](docs/ARCHITECTURE.md) - System design and structure
 
 ## Architecture
 
