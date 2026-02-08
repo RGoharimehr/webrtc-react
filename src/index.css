@@ -9,8 +9,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0d0d0d;
-  color: #fff;
+  background: #ffffff;
+  color: #24292f;
 }
 
 code {
@@ -18,21 +18,21 @@ code {
     monospace;
 }
 
-/* Scrollbar Styling */
+/* Scrollbar Styling - GitHub style */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: #f6f8fa;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #444;
-  border-radius: 5px;
+  background: #d0d7de;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #76b900;
+  background: #57606a;
 }

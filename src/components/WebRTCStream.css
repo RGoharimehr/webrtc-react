@@ -2,15 +2,16 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1a1a1a;
-  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
   overflow: hidden;
 }
 
 .stream-container {
   position: relative;
   flex: 1;
-  background: #000;
+  background: #24292f;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -28,11 +29,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(36, 41, 47, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #ffffff;
 }
 
 .overlay-content {
@@ -40,33 +41,37 @@
 }
 
 .overlay-content h3 {
-  margin: 0 0 10px 0;
-  font-size: 24px;
-  color: #76b900;
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
 }
 
 .overlay-content p {
   margin: 0;
-  font-size: 14px;
-  color: #aaa;
+  font-size: 12px;
+  color: #d0d7de;
 }
 
 .stream-controls {
   display: flex;
-  gap: 10px;
-  padding: 15px;
-  background: #2a2a2a;
+  gap: 8px;
+  padding: 12px;
+  background: #f6f8fa;
   align-items: center;
+  border-top: 1px solid #d0d7de;
 }
 
 .btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  font-size: 14px;
-  font-weight: 600;
+  padding: 5px 16px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background 0.2s ease;
+  background: #ffffff;
+  color: #24292f;
 }
 
 .btn:disabled {
@@ -75,48 +80,57 @@
 }
 
 .btn-primary {
-  background: #76b900;
-  color: #fff;
+  background: #0969da;
+  color: #ffffff;
+  border-color: #0969da;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #5a9100;
+  background: #0550ae;
+  border-color: #0550ae;
 }
 
 .btn-secondary {
-  background: #444;
-  color: #fff;
+  background: #ffffff;
+  color: #24292f;
+  border-color: #d0d7de;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #555;
+  background: #f6f8fa;
+  border-color: #57606a;
 }
 
 .status-badge {
   margin-left: auto;
-  padding: 6px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
   text-transform: capitalize;
+  border: 1px solid #d0d7de;
 }
 
 .status-disconnected {
-  background: #666;
-  color: #fff;
+  background: #f6f8fa;
+  color: #57606a;
+  border-color: #d0d7de;
 }
 
 .status-connecting {
-  background: #ff9800;
-  color: #fff;
+  background: #fff8c5;
+  color: #4d2d00;
+  border-color: #bf8700;
 }
 
 .status-connected {
-  background: #76b900;
-  color: #fff;
+  background: #dafbe1;
+  color: #0f5323;
+  border-color: #1a7f37;
 }
 
 .status-failed {
-  background: #f44336;
-  color: #fff;
+  background: #ffebe9;
+  color: #6e011a;
+  border-color: #cf222e;
 }

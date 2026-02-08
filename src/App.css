@@ -2,15 +2,14 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #0d0d0d;
-  color: #fff;
+  background: #f6f8fa;
+  color: #24292f;
 }
 
 .app-header {
-  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
-  padding: 20px 30px;
-  border-bottom: 3px solid #76b900;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  background: #ffffff;
+  padding: 16px 24px;
+  border-bottom: 1px solid #d0d7de;
 }
 
 .header-content {
@@ -23,77 +22,69 @@
 
 .logo-section h1 {
   margin: 0;
-  font-size: 28px;
-  font-weight: 700;
-  color: #76b900;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #24292f;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .tagline {
-  margin: 5px 0 0 0;
-  font-size: 14px;
-  color: #aaa;
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: #57606a;
   font-weight: 400;
 }
 
 .header-actions {
   display: flex;
-  gap: 20px;
+  gap: 12px;
   align-items: center;
 }
 
 .connection-indicator {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: #2a2a2a;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
   text-transform: capitalize;
+  color: #24292f;
 }
 
 .indicator-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #666;
-  animation: pulse 2s infinite;
+  background: #6e7781;
 }
 
 .connection-indicator.connected .indicator-dot {
-  background: #76b900;
+  background: #1a7f37;
 }
 
 .connection-indicator.connecting .indicator-dot {
-  background: #ff9800;
+  background: #bf8700;
 }
 
 .connection-indicator.failed .indicator-dot {
-  background: #f44336;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  background: #cf222e;
 }
 
 .app-main {
   flex: 1;
-  padding: 20px;
+  padding: 16px;
   overflow: hidden;
 }
 
 .layout-grid {
   display: grid;
-  grid-template-columns: 350px 1fr 350px;
-  gap: 20px;
+  grid-template-columns: 320px 1fr 320px;
+  gap: 16px;
   height: 100%;
   max-width: 1920px;
   margin: 0 auto;
@@ -102,7 +93,7 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 180px);
+  height: calc(100vh - 140px);
   overflow: hidden;
 }
 
@@ -117,8 +108,8 @@
 .main-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  height: calc(100vh - 180px);
+  gap: 16px;
+  height: calc(100vh - 140px);
 }
 
 .content-section {
@@ -131,22 +122,22 @@
 }
 
 .app-footer {
-  background: #1a1a1a;
-  padding: 15px 30px;
+  background: #ffffff;
+  padding: 12px 24px;
   text-align: center;
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid #d0d7de;
 }
 
 .app-footer p {
   margin: 0;
-  font-size: 13px;
-  color: #666;
+  font-size: 12px;
+  color: #57606a;
 }
 
 /* Responsive Design */
 @media (max-width: 1400px) {
   .layout-grid {
-    grid-template-columns: 300px 1fr 300px;
+    grid-template-columns: 280px 1fr 280px;
   }
 }
 
@@ -179,24 +170,24 @@
 
 @media (max-width: 768px) {
   .app-header {
-    padding: 15px 20px;
+    padding: 12px 16px;
   }
 
   .header-content {
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
     text-align: center;
   }
 
   .logo-section h1 {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .app-main {
-    padding: 10px;
+    padding: 8px;
   }
 
   .layout-grid {
-    gap: 10px;
+    gap: 8px;
   }
 }
