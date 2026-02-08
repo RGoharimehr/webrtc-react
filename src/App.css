@@ -1,0 +1,202 @@
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0d0d0d;
+  color: #fff;
+}
+
+.app-header {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  padding: 20px 30px;
+  border-bottom: 3px solid #76b900;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1920px;
+  margin: 0 auto;
+}
+
+.logo-section h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #76b900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tagline {
+  margin: 5px 0 0 0;
+  font-size: 14px;
+  color: #aaa;
+  font-weight: 400;
+}
+
+.header-actions {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #2a2a2a;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #666;
+  animation: pulse 2s infinite;
+}
+
+.connection-indicator.connected .indicator-dot {
+  background: #76b900;
+}
+
+.connection-indicator.connecting .indicator-dot {
+  background: #ff9800;
+}
+
+.connection-indicator.failed .indicator-dot {
+  background: #f44336;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.app-main {
+  flex: 1;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.layout-grid {
+  display: grid;
+  grid-template-columns: 350px 1fr 350px;
+  gap: 20px;
+  height: 100%;
+  max-width: 1920px;
+  margin: 0 auto;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 180px);
+  overflow: hidden;
+}
+
+.sidebar-left {
+  /* Control Panel */
+}
+
+.sidebar-right {
+  /* Command Panel */
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: calc(100vh - 180px);
+}
+
+.content-section {
+  flex: 1;
+  min-height: 0;
+}
+
+.content-section:first-child {
+  flex: 2;
+}
+
+.app-footer {
+  background: #1a1a1a;
+  padding: 15px 30px;
+  text-align: center;
+  border-top: 1px solid #2a2a2a;
+}
+
+.app-footer p {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}
+
+/* Responsive Design */
+@media (max-width: 1400px) {
+  .layout-grid {
+    grid-template-columns: 300px 1fr 300px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .layout-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .main-content {
+    order: 1;
+  }
+
+  .sidebar-left {
+    order: 2;
+  }
+
+  .sidebar-right {
+    order: 3;
+  }
+
+  .sidebar {
+    height: auto;
+  }
+
+  .main-content {
+    height: 600px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 15px 20px;
+  }
+
+  .header-content {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+
+  .logo-section h1 {
+    font-size: 20px;
+  }
+
+  .app-main {
+    padding: 10px;
+  }
+
+  .layout-grid {
+    gap: 10px;
+  }
+}
