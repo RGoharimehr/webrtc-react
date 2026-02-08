@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import './WebRTCStream.css';
 
 interface WebRTCStreamProps {
@@ -7,61 +7,72 @@ interface WebRTCStreamProps {
 }
 
 const WebRTCStream: React.FC<WebRTCStreamProps> = ({ 
-  serverUrl = 'ws://localhost:8080',
   onConnectionStateChange 
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [connectionState, setConnectionState] = useState<string>('disconnected');
-  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
+  const [cameraState, setCameraState] = useState<string>('inactive');
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const [error, setError] = useState<string>('');
 
-  useEffect(() => {
-    if (videoRef.current && peerConnection) {
-      // Handle incoming streams
-      peerConnection.ontrack = (event) => {
-        if (videoRef.current && event.streams[0]) {
-          videoRef.current.srcObject = event.streams[0];
-        }
-      };
-    }
-  }, [peerConnection]);
-
-  const connectWebRTC = async () => {
+  const startCamera = async () => {
     try {
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' }
-        ]
+      setCameraState('requesting');
+      setError('');
+      onConnectionStateChange?.('requesting');
+
+      // Request camera access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        },
+        audio: false
       });
 
-      pc.oniceconnectionstatechange = () => {
-        const state = pc.iceConnectionState;
-        setConnectionState(state);
-        onConnectionStateChange?.(state);
-      };
+      // Set the stream to the video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
 
-      pc.ontrack = (event) => {
-        if (videoRef.current && event.streams[0]) {
-          videoRef.current.srcObject = event.streams[0];
-        }
-      };
-
-      setPeerConnection(pc);
-      setConnectionState('connecting');
-    } catch (error) {
-      console.error('Error connecting WebRTC:', error);
-      setConnectionState('failed');
+      setMediaStream(stream);
+      setCameraState('active');
+      onConnectionStateChange?.('active');
+    } catch (error: any) {
+      console.error('Error accessing camera:', error);
+      let errorMessage = 'Failed to access camera';
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        errorMessage = 'Camera permission denied';
+        setCameraState('denied');
+        onConnectionStateChange?.('denied');
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        errorMessage = 'No camera found';
+        setCameraState('not-found');
+        onConnectionStateChange?.('not-found');
+      } else {
+        setCameraState('error');
+        onConnectionStateChange?.('error');
+      }
+      
+      setError(errorMessage);
     }
   };
 
-  const disconnectWebRTC = () => {
-    if (peerConnection) {
-      peerConnection.close();
-      setPeerConnection(null);
-      setConnectionState('disconnected');
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
+  const stopCamera = () => {
+    if (mediaStream) {
+      // Stop all tracks
+      mediaStream.getTracks().forEach(track => track.stop());
+      setMediaStream(null);
     }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
+    setCameraState('inactive');
+    setError('');
+    onConnectionStateChange?.('inactive');
   };
 
   return (
@@ -74,32 +85,49 @@ const WebRTCStream: React.FC<WebRTCStreamProps> = ({
           muted
           className="video-element"
         />
-        {connectionState === 'disconnected' && (
+        {cameraState === 'inactive' && !error && (
           <div className="stream-overlay">
             <div className="overlay-content">
-              <h3>WebRTC Stream</h3>
-              <p>Click Connect to start streaming</p>
+              <h3>📹 Camera View</h3>
+              <p>Click Start Camera to view your webcam</p>
+            </div>
+          </div>
+        )}
+        {error && (
+          <div className="stream-overlay">
+            <div className="overlay-content">
+              <h3>⚠️ Camera Error</h3>
+              <p>{error}</p>
+              {cameraState === 'denied' && (
+                <p style={{ fontSize: '11px', marginTop: '8px', color: '#bf8700' }}>
+                  Please allow camera access in your browser settings
+                </p>
+              )}
             </div>
           </div>
         )}
       </div>
       <div className="stream-controls">
         <button 
-          onClick={connectWebRTC} 
-          disabled={connectionState !== 'disconnected'}
+          onClick={startCamera} 
+          disabled={cameraState === 'active' || cameraState === 'requesting'}
           className="btn btn-primary"
         >
-          Connect
+          {cameraState === 'requesting' ? 'Requesting...' : 'Start Camera'}
         </button>
         <button 
-          onClick={disconnectWebRTC} 
-          disabled={connectionState === 'disconnected'}
+          onClick={stopCamera} 
+          disabled={cameraState !== 'active'}
           className="btn btn-secondary"
         >
-          Disconnect
+          Stop Camera
         </button>
-        <span className={`status-badge status-${connectionState}`}>
-          {connectionState}
+        <span className={`status-badge status-${cameraState}`}>
+          {cameraState === 'active' ? '🟢 active' : 
+           cameraState === 'requesting' ? '🟡 requesting' :
+           cameraState === 'denied' ? '🔴 denied' :
+           cameraState === 'not-found' ? '🔴 no camera' :
+           cameraState === 'error' ? '🔴 error' : '⚪ inactive'}
         </span>
       </div>
     </div>

@@ -33,13 +33,17 @@ function App() {
       <header className="app-header">
         <div className="header-content">
           <div className="logo-section">
-            <h1>Omniverse WebRTC Controller</h1>
-            <p className="tagline">Interactive Digital Twin Interface</p>
+            <h1>WebRTC Camera Controller</h1>
+            <p className="tagline">Interactive Camera Interface</p>
           </div>
           <div className="header-actions">
             <span className={`connection-indicator ${connectionState}`}>
               <span className="indicator-dot"></span>
-              {connectionState}
+              {connectionState === 'active' ? 'camera active' : 
+               connectionState === 'requesting' ? 'requesting' : 
+               connectionState === 'denied' ? 'denied' :
+               connectionState === 'not-found' ? 'no camera' :
+               connectionState === 'error' ? 'error' : 'inactive'}
             </span>
           </div>
         </div>
@@ -81,7 +85,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>WebRTC-based Omniverse Controller | Powered by React & TypeScript</p>
+        <p>WebRTC Camera Interface | Powered by React & TypeScript</p>
       </footer>
     </div>
   );

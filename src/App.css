@@ -63,6 +63,26 @@
   background: #6e7781;
 }
 
+/* Camera states */
+.connection-indicator.active .indicator-dot {
+  background: #1a7f37;
+}
+
+.connection-indicator.requesting .indicator-dot {
+  background: #bf8700;
+}
+
+.connection-indicator.inactive .indicator-dot {
+  background: #6e7781;
+}
+
+.connection-indicator.denied .indicator-dot,
+.connection-indicator.not-found .indicator-dot,
+.connection-indicator.error .indicator-dot {
+  background: #cf222e;
+}
+
+/* Legacy WebRTC states */
 .connection-indicator.connected .indicator-dot {
   background: #1a7f37;
 }
