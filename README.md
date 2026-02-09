@@ -1,10 +1,17 @@
-# WebRTC React - Data Center Monitoring Dashboard with iOS 16 Glassmorphism
+# WebRTC React - Data Center Monitoring Dashboard with Draggable Panels
 
-A modern data center monitoring and control dashboard with WebRTC screen sharing, iOS 16-style glassmorphism effects, and live metrics visualization built with React.
+A modern data center monitoring and control dashboard with WebRTC screen sharing, iOS 16-style glassmorphism effects, **draggable and resizable panels**, and live metrics visualization built with React.
 
-![iOS Glassmorphism with Graphs](https://github.com/user-attachments/assets/a3a3d02f-0c95-460d-8344-b261e4ee73c8)
+![Draggable Panels](https://github.com/user-attachments/assets/529e7035-0c2d-4515-9397-4bc7ae66ae18)
 
 ## Features
+
+🎯 **Draggable & Resizable Panels** ⭐ NEW!
+- Move panels anywhere on screen by dragging the header
+- Resize from any edge or corner (8 resize handles)
+- Constrained to viewport boundaries
+- Dashboard: 250-500px width, Live Metrics: 200-400px width
+- Smooth transitions and visual feedback
 
 🖥️ **Full-Screen WebRTC Streaming**
 - Share entire screen or specific windows
@@ -19,18 +26,25 @@ A modern data center monitoring and control dashboard with WebRTC screen sharing
 - Subtle inset glow effects
 - Matches iOS 16 design language
 
+🎨 **Standardized Typography & Sizing** ⭐ NEW!
+- Consistent font sizes across all components
+- Uniform button heights (32px) and spacing
+- CSS variable-based design system
+- Professional, clean appearance
+- Optimized readability
+
 📊 **Live Metrics Panel**
-- Separate always-visible graphs panel on right side
+- Draggable panel positioned on left side
 - Real-time temperature and power consumption charts
 - SVG-based smooth line graphs with gradient fills
 - Current values and trend indicators
-- Glass-tinted backgrounds (no white backgrounds)
+- Glass-tinted backgrounds
 
-🎮 **Compact HUD Overlay**
-- Floating control panel in top-right corner
-- Minimize/expand functionality (+ / - buttons)
+🎮 **Compact HUD Dashboard**
+- Draggable control panel (initially top-right)
+- Resizable from 250px to 500px width
+- Minimize/expand functionality
 - Semi-transparent with backdrop blur effect
-- Stays on top of the video stream
 - All controls accessible without blocking the stream
 
 📊 **7 Functional Control Tabs**
@@ -135,26 +149,36 @@ This will:
    - Click "Share" in the browser dialog
    - Your screen will fill the entire window
 
-2. **View Live Metrics**
-   - Graphs panel appears automatically on the right side
+2. **Move and Resize Panels** ⭐ NEW!
+   - **To Move**: Click and drag the panel header (with ⋮⋮ icon)
+   - **To Resize**: Hover near any edge or corner and drag
+   - **Dashboard Panel**: 250-500px width, 400-900px height
+   - **Live Metrics Panel**: 200-400px width, 400-900px height
+   - Panels stay within screen boundaries automatically
+
+3. **View Live Metrics**
+   - Graphs panel initially positioned on the left side
    - Shows real-time temperature and power consumption
    - Always visible for continuous monitoring
    - Glass-tinted backgrounds for iOS 16 aesthetic
+   - Drag to reposition anywhere on screen
 
-3. **Use the HUD Controls**
-   - HUD panel appears in the top-right corner
+4. **Use the Dashboard Controls**
+   - Dashboard panel initially positioned on the right side
    - Click tabs to switch between different control sections
-   - Use the "−" button to minimize the HUD to just the title bar
-   - Use the "+" button to expand the HUD again
-   - Click the "■" button to stop screen sharing
+   - Use the "− Minimize" button to collapse the panel
+   - Use the "+ Expand" button to restore the panel
+   - Click the "■ Stop" button to stop screen sharing
+   - Drag to your preferred position
 
-4. **Adjust Parameters**
-   - All controls work the same as before, just in compact form
+5. **Adjust Parameters**
+   - All controls work in the compact draggable form
    - Sliders show real-time values
    - Dropdowns for discrete selections
    - Logs track all operations
+   - Standardized button sizes and spacing
 
-5. **iOS 16 Glassmorphism**
+6. **iOS 16 Glassmorphism**
    - Both panels use ultra-modern glass effects
    - 40px backdrop blur with 180% saturation
    - Tinted semi-transparent backgrounds
@@ -316,6 +340,14 @@ The complete interface featuring:
   - Always visible for continuous monitoring
 - **Background**: WebRTC stream with start prompt
 - **Glass Effect**: 40px backdrop blur, 180% saturation, tinted overlays
+- **Draggable & Resizable**: Custom React component with mouse event handling
+
+## Documentation
+
+For detailed information about specific features:
+- **[Draggable Panels Guide](DRAGGABLE_PANELS_GUIDE.md)** - Complete guide to using and customizing draggable/resizable panels
+- **[Troubleshooting](TROUBLESHOOTING.md)** - Solutions for common issues
+- **[Solution Summary](SOLUTION_SUMMARY.md)** - Overview of implementation approach
 
 ## Technology Stack
 
@@ -325,6 +357,7 @@ The complete interface featuring:
 - **SVG** - Smooth line charts with gradient fills
 - **JavaScript ES6+** - Modern syntax and features
 - **Session Storage** - Tab persistence across refreshes
+- **Custom Components** - Draggable/resizable panel system
 
 ## License
 
