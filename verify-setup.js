@@ -9,6 +9,12 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// Configuration constants
+const MIN_NODE_VERSION = 14;
+const MIN_PACKAGES_EXPECTED = 100; // Minimum packages for a valid React app installation
+const TYPICAL_PACKAGES_RANGE = '1000+'; // Typical package count for react-scripts
+const REQUIRED_DEPENDENCIES = ['react', 'react-dom', 'react-scripts'];
+
 console.log('🔍 WebRTC React Setup Verification\n');
 console.log('='.repeat(50));
 
@@ -19,8 +25,8 @@ try {
   const nodeVersion = process.version;
   console.log(`✓ Node.js version: ${nodeVersion}`);
   const majorVersion = parseInt(nodeVersion.slice(1).split('.')[0]);
-  if (majorVersion < 14) {
-    console.log('  ⚠️  Warning: Node.js 14 or higher is recommended');
+  if (majorVersion < MIN_NODE_VERSION) {
+    console.log(`  ⚠️  Warning: Node.js ${MIN_NODE_VERSION} or higher is recommended`);
     hasErrors = true;
   }
 } catch (error) {
@@ -49,8 +55,7 @@ try {
     
     // Check dependencies
     const deps = packageJson.dependencies || {};
-    const expectedDeps = ['react', 'react-dom', 'react-scripts'];
-    const missingDeps = expectedDeps.filter(dep => !deps[dep]);
+    const missingDeps = REQUIRED_DEPENDENCIES.filter(dep => !deps[dep]);
     
     if (missingDeps.length > 0) {
       console.log(`✗ Missing dependencies: ${missingDeps.join(', ')}`);
@@ -91,8 +96,8 @@ if (!fs.existsSync(nodeModulesPath)) {
       const packageCount = packages.length;
       console.log(`✓ Installed packages: ${packageCount}`);
       
-      if (packageCount < 100) {
-        console.log('  ⚠️  Warning: Too few packages installed (expected ~1000+)');
+      if (packageCount < MIN_PACKAGES_EXPECTED) {
+        console.log(`  ⚠️  Warning: Too few packages installed (expected ${TYPICAL_PACKAGES_RANGE})`);
         console.log('     This suggests an incomplete installation.');
         hasErrors = true;
       }
