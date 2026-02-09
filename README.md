@@ -29,9 +29,9 @@ npm start
 ```
 
 This will:
-- Install all required dependencies including `react-scripts`
 - Start the development server
 - Open the application in your default browser at `http://localhost:3000`
+
 
 ## Available Scripts
 

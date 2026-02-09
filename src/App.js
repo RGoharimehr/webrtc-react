@@ -20,6 +20,17 @@ function App() {
       setLocalStream(stream);
     } catch (error) {
       console.error('Error accessing media devices:', error);
+      let errorMessage = 'Failed to access camera/microphone. ';
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'Permission denied. Please allow camera and microphone access.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage += 'No camera or microphone found.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage += 'Camera or microphone is already in use.';
+      } else {
+        errorMessage += error.message;
+      }
+      alert(errorMessage);
     }
   };
 
