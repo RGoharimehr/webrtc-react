@@ -251,9 +251,9 @@ body {
 
 .hud-tab-scroll {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px;
+  flex-direction: row;
+  gap: 4px;
+  padding: 6px;
 }
 
 .hud-tab-button {
@@ -277,7 +277,7 @@ body {
 .hud-tab-button:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
-  transform: translateX(2px);
+  transform: translateY(-2px);
 }
 
 .hud-tab-button.active {

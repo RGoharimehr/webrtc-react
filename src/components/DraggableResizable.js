@@ -80,22 +80,52 @@ const DraggableResizable = ({
     let newX = position.x;
     let newY = position.y;
 
+    // Handle east (right) resize
     if (resizeDirection.includes('e')) {
-      newWidth = Math.max(minWidth, Math.min(maxWidth, size.width + deltaX));
+      const maxAllowedWidth = window.innerWidth - position.x;
+      newWidth = Math.max(minWidth, Math.min(maxWidth, Math.min(size.width + deltaX, maxAllowedWidth)));
     }
+    
+    // Handle south (bottom) resize
     if (resizeDirection.includes('s')) {
-      newHeight = Math.max(minHeight, Math.min(maxHeight, size.height + deltaY));
+      const maxAllowedHeight = window.innerHeight - position.y;
+      newHeight = Math.max(minHeight, Math.min(maxHeight, Math.min(size.height + deltaY, maxAllowedHeight)));
     }
+    
+    // Handle west (left) resize
     if (resizeDirection.includes('w')) {
-      const widthDelta = Math.max(minWidth, Math.min(maxWidth, size.width - deltaX)) - size.width;
-      newWidth = size.width - widthDelta;
-      newX = position.x - widthDelta;
+      const potentialWidth = size.width - deltaX;
+      const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, potentialWidth));
+      const widthChange = size.width - constrainedWidth;
+      
+      // Make sure we don't go beyond left edge
+      const potentialX = position.x - widthChange;
+      if (potentialX >= 0) {
+        newWidth = constrainedWidth;
+        newX = potentialX;
+      }
     }
+    
+    // Handle north (top) resize
     if (resizeDirection.includes('n')) {
-      const heightDelta = Math.max(minHeight, Math.min(maxHeight, size.height - deltaY)) - size.height;
-      newHeight = size.height - heightDelta;
-      newY = position.y - heightDelta;
+      const potentialHeight = size.height - deltaY;
+      const constrainedHeight = Math.max(minHeight, Math.min(maxHeight, potentialHeight));
+      const heightChange = size.height - constrainedHeight;
+      
+      // Make sure we don't go beyond top edge
+      const potentialY = position.y - heightChange;
+      if (potentialY >= 0) {
+        newHeight = constrainedHeight;
+        newY = potentialY;
+      }
     }
+
+    // Final boundary check to ensure panel stays within viewport
+    const maxX = Math.max(0, window.innerWidth - newWidth);
+    const maxY = Math.max(0, window.innerHeight - newHeight);
+    
+    newX = Math.max(0, Math.min(newX, maxX));
+    newY = Math.max(0, Math.min(newY, maxY));
 
     setSize({ width: newWidth, height: newHeight });
     setPosition({ x: newX, y: newY });
