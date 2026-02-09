@@ -8,6 +8,7 @@ import Configuration from './tabs/Configuration';
 import ResultsMapping from './tabs/ResultsMapping';
 import CFDAnalysis from './tabs/CFDAnalysis';
 import GraphsPanel from './components/GraphsPanel';
+import DraggableResizable from './components/DraggableResizable';
 
 function App() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -129,20 +130,38 @@ function App() {
         )}
       </div>
 
-      {/* Graphs Panel - Left Side Column */}
-      <GraphsPanel plottingVariables={plottingVariables} />
+      {/* Graphs Panel - Left Side - Draggable & Resizable */}
+      <DraggableResizable
+        initialX={20}
+        initialY={20}
+        initialWidth={240}
+        initialHeight={600}
+        minWidth={200}
+        minHeight={400}
+        maxWidth={400}
+        maxHeight={900}
+        title="Live Metrics"
+      >
+        <GraphsPanel plottingVariables={plottingVariables} />
+      </DraggableResizable>
 
-      {/* HUD Overlay - Top Right */}
-      <div className={`hud-overlay ${hudExpanded ? 'expanded' : 'minimized'}`}>
-        <div className="hud-header">
-          <div className="hud-title">
-            <span className="hud-icon">🏢</span>
-            <span>Data Center Control</span>
-          </div>
-          <div className="hud-controls">
+      {/* HUD Dashboard - Right Side - Draggable & Resizable */}
+      <DraggableResizable
+        initialX={window.innerWidth - 300}
+        initialY={20}
+        initialWidth={280}
+        initialHeight={600}
+        minWidth={250}
+        minHeight={400}
+        maxWidth={500}
+        maxHeight={900}
+        title="Dashboard Control"
+      >
+        <div className={`hud-content-wrapper ${hudExpanded ? 'expanded' : 'minimized'}`}>
+          <div className="hud-controls-inline">
             {isStreaming && (
               <button className="hud-button stop-button" onClick={stopScreenShare} title="Stop Streaming">
-                ■
+                ■ Stop
               </button>
             )}
             <button 
@@ -150,35 +169,35 @@ function App() {
               onClick={() => setHudExpanded(!hudExpanded)}
               title={hudExpanded ? "Minimize" : "Expand"}
             >
-              {hudExpanded ? '−' : '+'}
+              {hudExpanded ? '− Minimize' : '+ Expand'}
             </button>
           </div>
-        </div>
-        
-        {hudExpanded && (
-          <>
-            {/* Tab Navigation */}
-            <div className="hud-tab-navigation">
-              <div className="hud-tab-scroll">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab}
-                    className={`hud-tab-button ${activeTab === tab ? 'active' : ''}`}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    {tab}
-                  </button>
-                ))}
+          
+          {hudExpanded && (
+            <>
+              {/* Tab Navigation */}
+              <div className="hud-tab-navigation">
+                <div className="hud-tab-scroll">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab}
+                      className={`hud-tab-button ${activeTab === tab ? 'active' : ''}`}
+                      onClick={() => setActiveTab(tab)}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Tab Content */}
-            <div className="hud-content">
-              {renderTabContent()}
-            </div>
-          </>
-        )}
-      </div>
+              {/* Tab Content */}
+              <div className="hud-content">
+                {renderTabContent()}
+              </div>
+            </>
+          )}
+        </div>
+      </DraggableResizable>
     </div>
   );
 }

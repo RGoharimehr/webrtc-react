@@ -11,6 +11,28 @@
   --success-green: #33ff33;
   --error-red: #ff3333;
   --warning-yellow: #ffcc00;
+  
+  /* Standardized Typography Scale */
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+  
+  /* Standardized Component Heights */
+  --button-height-sm: 28px;
+  --button-height-base: 32px;
+  --button-height-lg: 36px;
+  --input-height: 32px;
+  
+  /* Standardized Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-base: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 20px;
+  --spacing-xl: 24px;
 }
 
 * {
@@ -148,64 +170,64 @@ body {
   width: 220px;
 }
 
-/* HUD Header */
-.hud-header {
+/* HUD Content Wrapper */
+.hud-content-wrapper {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
+  flex-direction: column;
+  height: 100%;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hud-content-wrapper.minimized {
+  height: auto;
+}
+
+/* HUD Controls Inline */
+.hud-controls-inline {
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
   background: rgba(134, 239, 71, 0.08);
-  border-bottom: none;
-  border-radius: 4px 4px 0 0;
-  cursor: move;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.hud-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent-green);
-}
-
-.hud-icon {
-  font-size: 16px;
-}
-
-.hud-controls {
-  display: flex;
-  gap: 8px;
-}
-
+/* Standardized Buttons */
 .hud-button {
-  width: 24px;
-  height: 24px;
-  padding: 0;
+  height: var(--button-height-base);
+  padding: 0 var(--spacing-base);
   background: rgba(255, 255, 255, 0.1);
   border: none;
-  border-radius: 3px;
+  border-radius: 4px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: var(--spacing-xs);
+  white-space: nowrap;
 }
 
 .hud-button:hover {
   background: rgba(255, 255, 255, 0.2);
-  transform: scale(1.05);
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.hud-button:active {
+  transform: scale(0.98);
 }
 
 .hud-button.stop-button {
   background: rgba(255, 69, 58, 0.3);
-  border-color: rgba(255, 69, 58, 0.5);
+  color: #ff453a;
 }
 
 .hud-button.stop-button:hover {
   background: rgba(255, 69, 58, 0.5);
+  color: #ffffff;
 }
 
 /* HUD Tab Navigation */
@@ -236,29 +258,33 @@ body {
 
 .hud-tab-button {
   flex: 0 0 auto;
-  padding: 8px 12px;
+  height: var(--button-height-base);
+  padding: 0 var(--spacing-base);
   background: rgba(255, 255, 255, 0.05);
   border: none;
-  border-radius: 3px;
+  border-radius: 4px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
 }
 
 .hud-tab-button:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
+  transform: translateX(2px);
 }
 
 .hud-tab-button.active {
   background: var(--accent-blue);
-  border-color: var(--accent-blue);
   color: var(--text-primary);
   font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 80, 224, 0.3);
 }
 
 /* HUD Content */
@@ -290,22 +316,22 @@ body {
 }
 
 .hud-content .section-title {
-  font-size: 16px;
+  font-size: var(--font-size-md);
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: var(--spacing-sm);
   color: var(--accent-green);
 }
 
 .hud-content .input-row {
   display: flex;
   align-items: center;
-  margin-bottom: 10px;
-  gap: 8px;
+  margin-bottom: var(--spacing-sm);
+  gap: var(--spacing-sm);
 }
 
 .hud-content .input-label {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-primary);
 }
 
@@ -313,13 +339,13 @@ body {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-sm);
 }
 
 .hud-content .value-display {
   min-width: 60px;
   text-align: right;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--accent-green);
 }
@@ -761,58 +787,29 @@ button.warning:hover {
 }
 
 /* Graphs Panel - iOS 16 Glassmorphism on Left Side */
-.graphs-panel {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  z-index: 999;
-  width: 240px;
-  max-height: calc(100vh - 40px);
-  background: rgba(20, 20, 30, 0.7);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border-radius: 4px;
-  border: none;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(134, 239, 71, 0.3) transparent;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.graphs-panel::-webkit-scrollbar {
-  width: 6px;
-}
-
-.graphs-panel::-webkit-scrollbar-thumb {
-  background: rgba(134, 239, 71, 0.3);
-  border-radius: 3px;
-}
-
-.graphs-panel-header {
-  padding: 10px 12px;
-  background: rgba(134, 239, 71, 0.08);
-  border-bottom: none;
-  border-radius: 4px 4px 0 0;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-.graphs-panel-title {
+/* Graphs Panel Inner (for DraggableResizable wrapper) */
+.graphs-panel-inner {
+  height: 100%;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--accent-green);
+  flex-direction: column;
 }
 
 .graphs-panel-content {
-  padding: 12px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--spacing-base);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(134, 239, 71, 0.3) transparent;
+}
+
+.graphs-panel-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.graphs-panel-content::-webkit-scrollbar-thumb {
+  background: rgba(134, 239, 71, 0.3);
+  border-radius: 3px;
 }
 
 .graph-card {
@@ -821,8 +818,8 @@ button.warning:hover {
   -webkit-backdrop-filter: blur(20px);
   border: none;
   border-radius: 4px;
-  padding: 12px;
-  margin-bottom: 12px;
+  padding: var(--spacing-base);
+  margin-bottom: var(--spacing-base);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -833,17 +830,17 @@ button.warning:hover {
 }
 
 .graph-card-title {
-  font-size: 14px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 10px;
+  margin-bottom: var(--spacing-sm);
 }
 
 .graph-visualization {
   background: rgba(0, 0, 0, 0.2);
   border: none;
   border-radius: 3px;
-  padding: 8px;
+  padding: var(--spacing-sm);
   min-height: 100px;
   position: relative;
 }
@@ -857,26 +854,26 @@ button.warning:hover {
 .graph-metrics {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-base);
 }
 
 .graph-metric {
   background: rgba(0, 0, 0, 0.3);
   border: none;
   border-radius: 3px;
-  padding: 6px;
+  padding: var(--spacing-sm);
   text-align: center;
 }
 
 .graph-metric-label {
-  font-size: 9px;
+  font-size: var(--font-size-xs);
   color: var(--text-secondary);
-  margin-bottom: 3px;
+  margin-bottom: var(--spacing-xs);
 }
 
 .graph-metric-value {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 700;
   color: var(--accent-green);
 }

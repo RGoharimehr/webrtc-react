@@ -10,14 +10,7 @@ const GraphsPanel = ({ plottingVariables }) => {
   };
 
   return (
-    <div className="graphs-panel">
-      <div className="graphs-panel-header">
-        <div className="graphs-panel-title">
-          <span>📊</span>
-          <span>Live Metrics</span>
-        </div>
-      </div>
-      
+    <div className="graphs-panel-inner">
       <div className="graphs-panel-content">
         {/* Temperature Graph */}
         {graphs.temperature.enabled && (
