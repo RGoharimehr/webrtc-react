@@ -1,32 +1,49 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './App.css';
+import TabPanel from './TabPanel';
+import ControlPanel from './ControlPanel';
 
 function App() {
-  const [localStream, setLocalStream] = useState(null);
-  const localVideoRef = useRef(null);
+  const [screenStream, setScreenStream] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [leftPanelExpanded, setLeftPanelExpanded] = useState(true);
+  const [rightPanelExpanded, setRightPanelExpanded] = useState(true);
+  const videoRef = useRef(null);
 
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+    if (videoRef.current && screenStream) {
+      videoRef.current.srcObject = screenStream;
     }
-  }, [localStream]);
+  }, [screenStream]);
 
-  const startLocalVideo = async () => {
+  const startScreenShare = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          cursor: 'always',
+          displaySurface: 'monitor'
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        }
       });
-      setLocalStream(stream);
+      
+      setScreenStream(stream);
+      setIsStreaming(true);
+
+      // Handle user stopping the share via browser UI
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
     } catch (error) {
-      console.error('Error accessing media devices:', error);
-      let errorMessage = 'Failed to access camera/microphone. ';
+      console.error('Error starting screen share:', error);
+      let errorMessage = 'Failed to start screen sharing. ';
       if (error.name === 'NotAllowedError') {
-        errorMessage += 'Permission denied. Please allow camera and microphone access.';
+        errorMessage += 'Permission denied. Please allow screen sharing access.';
       } else if (error.name === 'NotFoundError') {
-        errorMessage += 'No camera or microphone found.';
-      } else if (error.name === 'NotReadableError') {
-        errorMessage += 'Camera or microphone is already in use.';
+        errorMessage += 'No screen sharing source found.';
       } else {
         errorMessage += error.message;
       }
@@ -34,42 +51,70 @@ function App() {
     }
   };
 
-  const stopLocalVideo = () => {
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      setLocalStream(null);
+  const stopScreenShare = () => {
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+      setScreenStream(null);
+      setIsStreaming(false);
     }
   };
 
   return (
     <div className="App">
-      <header className="App-header">
-        <h1>WebRTC React Application</h1>
-        <p>Simple WebRTC video streaming with React</p>
-      </header>
-      <main className="App-main">
-        <div className="video-container">
-          <div className="video-box">
-            <h3>Local Video</h3>
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className="video-player"
-            />
-          </div>
+      {/* HUD Panels */}
+      <TabPanel 
+        isExpanded={leftPanelExpanded}
+        onToggle={() => setLeftPanelExpanded(!leftPanelExpanded)}
+      />
+      
+      <ControlPanel 
+        isExpanded={rightPanelExpanded}
+        onToggle={() => setRightPanelExpanded(!rightPanelExpanded)}
+      />
 
+      {/* Main Content */}
+      <div className="main-content">
+        <div className="stream-container">
+          {!isStreaming ? (
+            <div className="start-screen">
+              <div className="start-screen-content">
+                <div className="app-icon">🖥️</div>
+                <h1>WebRTC Screen Share</h1>
+                <p>Share your screen with advanced HUD controls</p>
+                <button 
+                  className="start-button"
+                  onClick={startScreenShare}
+                >
+                  <span className="button-icon">▶</span>
+                  Start Screen Sharing
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="video-display">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="screen-video"
+              />
+              <div className="video-overlay">
+                <div className="stream-indicator">
+                  <span className="indicator-dot"></span>
+                  <span>Streaming</span>
+                </div>
+                <button 
+                  className="stop-button"
+                  onClick={stopScreenShare}
+                >
+                  <span>■</span>
+                  Stop Sharing
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="controls">
-          <button onClick={startLocalVideo} disabled={localStream !== null}>
-            Start Video
-          </button>
-          <button onClick={stopLocalVideo} disabled={localStream === null}>
-            Stop Video
-          </button>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
