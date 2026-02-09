@@ -1,19 +1,11 @@
 import React, { useState } from 'react';
 
-const Plotting = () => {
-  const [yVariables, setYVariables] = useState({
-    temperature: true,
-    pressure: false,
-    velocity: false,
-    power: true,
-    humidity: false
-  });
-
+const Plotting = ({ plottingVariables, setPlottingVariables }) => {
   const [xAxis, setXAxis] = useState('time');
   const [hasData, setHasData] = useState(false);
 
   const toggleVariable = (variable) => {
-    setYVariables(prev => ({ ...prev, [variable]: !prev[variable] }));
+    setPlottingVariables(prev => ({ ...prev, [variable]: !prev[variable] }));
   };
 
   const addPlot = () => {
@@ -22,7 +14,7 @@ const Plotting = () => {
 
   const clearPlots = () => {
     setHasData(false);
-    setYVariables({
+    setPlottingVariables({
       temperature: false,
       pressure: false,
       velocity: false,
@@ -43,7 +35,7 @@ const Plotting = () => {
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="checkbox"
-                checked={yVariables.temperature}
+                checked={plottingVariables.temperature}
                 onChange={() => toggleVariable('temperature')}
               />
               <span>Temperature [°C]</span>
@@ -51,7 +43,7 @@ const Plotting = () => {
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="checkbox"
-                checked={yVariables.pressure}
+                checked={plottingVariables.pressure}
                 onChange={() => toggleVariable('pressure')}
               />
               <span>Pressure [Pa]</span>
@@ -59,7 +51,7 @@ const Plotting = () => {
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="checkbox"
-                checked={yVariables.velocity}
+                checked={plottingVariables.velocity}
                 onChange={() => toggleVariable('velocity')}
               />
               <span>Velocity [m/s]</span>
@@ -67,7 +59,7 @@ const Plotting = () => {
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="checkbox"
-                checked={yVariables.power}
+                checked={plottingVariables.power}
                 onChange={() => toggleVariable('power')}
               />
               <span>Power Consumption [kW]</span>
@@ -75,7 +67,7 @@ const Plotting = () => {
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="checkbox"
-                checked={yVariables.humidity}
+                checked={plottingVariables.humidity}
                 onChange={() => toggleVariable('humidity')}
               />
               <span>Humidity [%]</span>
@@ -165,7 +157,7 @@ const Plotting = () => {
               </div>
             </div>
 
-            {yVariables.power && (
+            {plottingVariables.power && (
               <div style={{
                 background: 'white',
                 borderRadius: '4px',

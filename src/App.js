@@ -19,6 +19,15 @@ function App() {
   const [hudExpanded, setHudExpanded] = useState(true);
   const videoRef = useRef(null);
 
+  // Shared plotting state
+  const [plottingVariables, setPlottingVariables] = useState({
+    temperature: true,
+    pressure: false,
+    velocity: false,
+    power: true,
+    humidity: false
+  });
+
   useEffect(() => {
     sessionStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
@@ -83,7 +92,7 @@ function App() {
       case 'Results Visualization':
         return <ResultsVisualization />;
       case 'Plotting':
-        return <Plotting />;
+        return <Plotting plottingVariables={plottingVariables} setPlottingVariables={setPlottingVariables} />;
       case 'Configuration':
         return <Configuration />;
       case 'Results Mapping':
@@ -120,8 +129,8 @@ function App() {
         )}
       </div>
 
-      {/* Graphs Panel - Right Side Column */}
-      <GraphsPanel />
+      {/* Graphs Panel - Left Side Column */}
+      <GraphsPanel plottingVariables={plottingVariables} />
 
       {/* HUD Overlay - Top Right */}
       <div className={`hud-overlay ${hudExpanded ? 'expanded' : 'minimized'}`}>

@@ -11,6 +11,15 @@ const ResultsVisualization = () => {
 
   const [logs, setLogs] = useState('');
 
+  // Colormap definitions
+  const colormaps = {
+    jet: 'linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000)',
+    rainbow: 'linear-gradient(to right, #9400d3, #4b0082, #0000ff, #00ff00, #ffff00, #ff7f00, #ff0000)',
+    hot: 'linear-gradient(to right, #000000, #ff0000, #ffff00, #ffffff)',
+    cool: 'linear-gradient(to right, #00ffff, #ff00ff)',
+    viridis: 'linear-gradient(to right, #440154, #31688e, #35b779, #fde724)'
+  };
+
   const applyVisualization = () => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => `${prev}\n[${timestamp}] Applied visualization: ${vizSettings.property} with ${vizSettings.colormap} colormap`);
@@ -88,30 +97,35 @@ const ResultsVisualization = () => {
       <div className="section">
         <h2 className="section-title">Color Legend</h2>
         <div style={{
-          height: '130px',
-          background: 'linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000)',
-          borderRadius: '8px',
-          border: '1px solid var(--border-color)',
+          height: '40px',
+          background: colormaps[vizSettings.colormap],
+          borderRadius: '4px',
+          border: 'none',
           position: 'relative',
-          marginBottom: '12px'
+          marginBottom: '12px',
+          transition: 'all 0.5s ease'
         }}>
           <div style={{
             position: 'absolute',
             left: '10px',
-            bottom: '10px',
+            top: '50%',
+            transform: 'translateY(-50%)',
             background: 'rgba(0,0,0,0.7)',
-            padding: '4px 8px',
-            borderRadius: '4px'
+            padding: '3px 6px',
+            borderRadius: '3px',
+            fontSize: '10px'
           }}>
             {vizSettings.manualBounds ? vizSettings.minBound : 'Min'}
           </div>
           <div style={{
             position: 'absolute',
             right: '10px',
-            bottom: '10px',
+            top: '50%',
+            transform: 'translateY(-50%)',
             background: 'rgba(0,0,0,0.7)',
-            padding: '4px 8px',
-            borderRadius: '4px'
+            padding: '3px 6px',
+            borderRadius: '3px',
+            fontSize: '10px'
           }}>
             {vizSettings.manualBounds ? vizSettings.maxBound : 'Max'}
           </div>
