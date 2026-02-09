@@ -1,190 +1,178 @@
-import React, { useState, useRef, useEffect } from 'react';
-import './DraggableResizable.css';
+import React, { useEffect, useRef, useState } from "react";
+import "./DraggableResizable.css";
 
-const DraggableResizable = ({
-  children,
-  initialX = 20,
-  initialY = 20,
-  initialWidth = 280,
-  initialHeight = 600,
-  minWidth = 200,
-  minHeight = 300,
-  maxWidth = 600,
-  maxHeight = 900,
+export default function DraggableResizable({
   title = "Panel",
-  onPositionChange,
+  children,
+  initialX = 40,
+  initialY = 40,
+  initialWidth = 320,
+  initialHeight = 520,
+  minWidth = 220,
+  minHeight = 200,
+  maxWidth = 900,
+  maxHeight = 900,
   hideDefaultHeader = false,
-  showResizeHandles = true,
   className = "",
-  style = {}
-}) => {
-  const [position, setPosition] = useState({ x: initialX, y: initialY });
-  const [size, setSize] = useState({ width: initialWidth, height: initialHeight });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeDirection, setResizeDirection] = useState('');
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  style = {},
+}) {
   const panelRef = useRef(null);
 
-  const handleMouseDown = (e) => {
-    // Drag starts when clicking anything that has class 'drag-handle'
-    // (this allows YOU to decide what becomes the draggable header)
-    const dragHandle = e.target.closest('.drag-handle');
-    if (dragHandle) {
-      setIsDragging(true);
-      setDragStart({
-        x: e.clientX - position.x,
-        y: e.clientY - position.y
-      });
-    }
+  const [pos, setPos] = useState({ x: initialX, y: initialY });
+  const [size, setSize] = useState({ width: initialWidth, height: initialHeight });
+
+  const dragState = useRef({
+    isDragging: false,
+    startX: 0,
+    startY: 0,
+    startLeft: 0,
+    startTop: 0,
+  });
+
+  const resizeState = useRef({
+    isResizing: false,
+    dir: "",
+    startX: 0,
+    startY: 0,
+    startW: 0,
+    startH: 0,
+    startLeft: 0,
+    startTop: 0,
+  });
+
+  // keep in bounds (viewport)
+  const clampToViewport = (x, y, w, h) => {
+    const maxX = Math.max(0, window.innerWidth - w);
+    const maxY = Math.max(0, window.innerHeight - h);
+    return {
+      x: Math.min(Math.max(0, x), maxX),
+      y: Math.min(Math.max(0, y), maxY),
+    };
   };
 
-  const handleMouseMove = (e) => {
-    if (isDragging) {
-      const newX = e.clientX - dragStart.x;
-      const newY = e.clientY - dragStart.y;
+  // Drag start (only when clicking an element with class drag-handle)
+  const onMouseDown = (e) => {
+    if (!e.target.closest(".drag-handle")) return;
 
-      const maxX = window.innerWidth - size.width;
-      const maxY = window.innerHeight - size.height;
+    dragState.current.isDragging = true;
+    dragState.current.startX = e.clientX;
+    dragState.current.startY = e.clientY;
+    dragState.current.startLeft = pos.x;
+    dragState.current.startTop = pos.y;
 
-      setPosition({
-        x: Math.max(0, Math.min(newX, maxX)),
-        y: Math.max(0, Math.min(newY, maxY))
-      });
-
-      if (onPositionChange) onPositionChange({ x: newX, y: newY });
-    }
-
-    if (isResizing) handleResize(e);
+    document.body.style.userSelect = "none";
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setIsResizing(false);
-    setResizeDirection('');
-  };
-
-  const handleResizeMouseDown = (e, direction) => {
+  // Resize start
+  const onResizeDown = (dir) => (e) => {
     e.stopPropagation();
-    setIsResizing(true);
-    setResizeDirection(direction);
-    setDragStart({ x: e.clientX, y: e.clientY });
-  };
+    resizeState.current.isResizing = true;
+    resizeState.current.dir = dir;
+    resizeState.current.startX = e.clientX;
+    resizeState.current.startY = e.clientY;
+    resizeState.current.startW = size.width;
+    resizeState.current.startH = size.height;
+    resizeState.current.startLeft = pos.x;
+    resizeState.current.startTop = pos.y;
 
-  const handleResize = (e) => {
-    const deltaX = e.clientX - dragStart.x;
-    const deltaY = e.clientY - dragStart.y;
-
-    let newWidth = size.width;
-    let newHeight = size.height;
-    let newX = position.x;
-    let newY = position.y;
-
-    if (resizeDirection.includes('e')) {
-      const maxAllowedWidth = window.innerWidth - position.x;
-      newWidth = Math.max(minWidth, Math.min(maxWidth, Math.min(size.width + deltaX, maxAllowedWidth)));
-    }
-
-    if (resizeDirection.includes('s')) {
-      const maxAllowedHeight = window.innerHeight - position.y;
-      newHeight = Math.max(minHeight, Math.min(maxHeight, Math.min(size.height + deltaY, maxAllowedHeight)));
-    }
-
-    if (resizeDirection.includes('w')) {
-      const potentialWidth = size.width - deltaX;
-      const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, potentialWidth));
-      const widthChange = size.width - constrainedWidth;
-
-      const potentialX = position.x - widthChange;
-      if (potentialX >= 0) {
-        newWidth = constrainedWidth;
-        newX = potentialX;
-      }
-    }
-
-    if (resizeDirection.includes('n')) {
-      const potentialHeight = size.height - deltaY;
-      const constrainedHeight = Math.max(minHeight, Math.min(maxHeight, potentialHeight));
-      const heightChange = size.height - constrainedHeight;
-
-      const potentialY = position.y - heightChange;
-      if (potentialY >= 0) {
-        newHeight = constrainedHeight;
-        newY = potentialY;
-      }
-    }
-
-    const maxX = Math.max(0, window.innerWidth - newWidth);
-    const maxY = Math.max(0, window.innerHeight - newHeight);
-
-    newX = Math.max(0, Math.min(newX, maxX));
-    newY = Math.max(0, Math.min(newY, maxY));
-
-    setSize({ width: newWidth, height: newHeight });
-    setPosition({ x: newX, y: newY });
-    setDragStart({ x: e.clientX, y: e.clientY });
+    document.body.style.userSelect = "none";
   };
 
   useEffect(() => {
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDragging, isResizing, dragStart, position, size]);
+    const onMove = (e) => {
+      // Dragging
+      if (dragState.current.isDragging) {
+        const dx = e.clientX - dragState.current.startX;
+        const dy = e.clientY - dragState.current.startY;
 
-  const headerHeight = hideDefaultHeader ? 0 : 34;
+        const nextX = dragState.current.startLeft + dx;
+        const nextY = dragState.current.startTop + dy;
+
+        const clamped = clampToViewport(nextX, nextY, size.width, size.height);
+        setPos(clamped);
+      }
+
+      // Resizing
+      if (resizeState.current.isResizing) {
+        const dx = e.clientX - resizeState.current.startX;
+        const dy = e.clientY - resizeState.current.startY;
+
+        let newW = resizeState.current.startW;
+        let newH = resizeState.current.startH;
+        let newX = resizeState.current.startLeft;
+        let newY = resizeState.current.startTop;
+
+        const dir = resizeState.current.dir;
+
+        if (dir.includes("e")) newW = resizeState.current.startW + dx;
+        if (dir.includes("s")) newH = resizeState.current.startH + dy;
+
+        if (dir.includes("w")) {
+          newW = resizeState.current.startW - dx;
+          newX = resizeState.current.startLeft + dx;
+        }
+
+        if (dir.includes("n")) {
+          newH = resizeState.current.startH - dy;
+          newY = resizeState.current.startTop + dy;
+        }
+
+        newW = Math.min(Math.max(minWidth, newW), maxWidth);
+        newH = Math.min(Math.max(minHeight, newH), maxHeight);
+
+        const clamped = clampToViewport(newX, newY, newW, newH);
+        setPos(clamped);
+        setSize({ width: newW, height: newH });
+      }
+    };
+
+    const onUp = () => {
+      dragState.current.isDragging = false;
+      resizeState.current.isResizing = false;
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [pos.x, pos.y, size.width, size.height, minWidth, minHeight, maxWidth, maxHeight]);
 
   return (
     <div
       ref={panelRef}
       className={`draggable-resizable ${className}`}
       style={{
-        position: 'fixed',
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: `${size.width}px`,
-        height: `${size.height}px`,
-        zIndex: isDragging || isResizing ? 1001 : 1000,
-        ...style
+        left: pos.x,
+        top: pos.y,
+        width: size.width,
+        height: size.height,
+        ...style,
       }}
-      onMouseDown={handleMouseDown}
+      onMouseDown={onMouseDown}
     >
       {!hideDefaultHeader && (
         <div className="drag-handle" title="Drag to move">
-          <span className="drag-icon">⋮⋮</span>
+          <span className="drag-icon">⠿</span>
           <span className="panel-title">{title}</span>
         </div>
       )}
 
-      <div
-        className="panel-content"
-        style={{
-          height: hideDefaultHeader ? '100%' : `calc(100% - ${headerHeight}px)`,
-          overflow: 'auto'
-        }}
-      >
-        {children}
-      </div>
+      {/* If hideDefaultHeader, user provides their own header inside children */}
+      <div className="panel-content">{children}</div>
 
-      {showResizeHandles && (
-        <>
-          <div className="resize-handle resize-n" onMouseDown={(e) => handleResizeMouseDown(e, 'n')} />
-          <div className="resize-handle resize-s" onMouseDown={(e) => handleResizeMouseDown(e, 's')} />
-          <div className="resize-handle resize-e" onMouseDown={(e) => handleResizeMouseDown(e, 'e')} />
-          <div className="resize-handle resize-w" onMouseDown={(e) => handleResizeMouseDown(e, 'w')} />
-          <div className="resize-handle resize-ne" onMouseDown={(e) => handleResizeMouseDown(e, 'ne')} />
-          <div className="resize-handle resize-nw" onMouseDown={(e) => handleResizeMouseDown(e, 'nw')} />
-          <div className="resize-handle resize-se" onMouseDown={(e) => handleResizeMouseDown(e, 'se')} />
-          <div className="resize-handle resize-sw" onMouseDown={(e) => handleResizeMouseDown(e, 'sw')} />
-        </>
-      )}
+      {/* resize handles */}
+      <div className="resize-handle resize-n" onMouseDown={onResizeDown("n")} />
+      <div className="resize-handle resize-s" onMouseDown={onResizeDown("s")} />
+      <div className="resize-handle resize-e" onMouseDown={onResizeDown("e")} />
+      <div className="resize-handle resize-w" onMouseDown={onResizeDown("w")} />
+      <div className="resize-handle resize-ne" onMouseDown={onResizeDown("ne")} />
+      <div className="resize-handle resize-nw" onMouseDown={onResizeDown("nw")} />
+      <div className="resize-handle resize-se" onMouseDown={onResizeDown("se")} />
+      <div className="resize-handle resize-sw" onMouseDown={onResizeDown("sw")} />
     </div>
   );
-};
-
-export default DraggableResizable;
+}
