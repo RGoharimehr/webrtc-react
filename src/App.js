@@ -1,120 +1,84 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
-import TabPanel from './TabPanel';
-import ControlPanel from './ControlPanel';
+import OperatingConditions from './tabs/OperatingConditions';
+import GeometricalDesign from './tabs/GeometricalDesign';
+import ResultsVisualization from './tabs/ResultsVisualization';
+import Plotting from './tabs/Plotting';
+import Configuration from './tabs/Configuration';
+import ResultsMapping from './tabs/ResultsMapping';
+import CFDAnalysis from './tabs/CFDAnalysis';
 
 function App() {
-  const [screenStream, setScreenStream] = useState(null);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [leftPanelExpanded, setLeftPanelExpanded] = useState(true);
-  const [rightPanelExpanded, setRightPanelExpanded] = useState(true);
-  const videoRef = useRef(null);
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem('activeTab') || 'Operating Conditions';
+  });
 
   useEffect(() => {
-    if (videoRef.current && screenStream) {
-      videoRef.current.srcObject = screenStream;
-    }
-  }, [screenStream]);
+    sessionStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
-  const startScreenShare = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          cursor: 'always',
-          displaySurface: 'monitor'
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100
-        }
-      });
-      
-      setScreenStream(stream);
-      setIsStreaming(true);
+  const tabs = [
+    'Operating Conditions',
+    'Geometrical Design',
+    'Results Visualization',
+    'Plotting',
+    'Configuration',
+    'Results Mapping',
+    'CFD Analysis'
+  ];
 
-      // Handle user stopping the share via browser UI
-      stream.getVideoTracks()[0].onended = () => {
-        stopScreenShare();
-      };
-    } catch (error) {
-      console.error('Error starting screen share:', error);
-      let errorMessage = 'Failed to start screen sharing. ';
-      if (error.name === 'NotAllowedError') {
-        errorMessage += 'Permission denied. Please allow screen sharing access.';
-      } else if (error.name === 'NotFoundError') {
-        errorMessage += 'No screen sharing source found.';
-      } else {
-        errorMessage += error.message;
-      }
-      alert(errorMessage);
-    }
-  };
-
-  const stopScreenShare = () => {
-    if (screenStream) {
-      screenStream.getTracks().forEach(track => track.stop());
-      setScreenStream(null);
-      setIsStreaming(false);
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'Operating Conditions':
+        return <OperatingConditions />;
+      case 'Geometrical Design':
+        return <GeometricalDesign />;
+      case 'Results Visualization':
+        return <ResultsVisualization />;
+      case 'Plotting':
+        return <Plotting />;
+      case 'Configuration':
+        return <Configuration />;
+      case 'Results Mapping':
+        return <ResultsMapping />;
+      case 'CFD Analysis':
+        return <CFDAnalysis />;
+      default:
+        return <OperatingConditions />;
     }
   };
 
   return (
     <div className="App">
-      {/* HUD Panels */}
-      <TabPanel 
-        isExpanded={leftPanelExpanded}
-        onToggle={() => setLeftPanelExpanded(!leftPanelExpanded)}
-      />
-      
-      <ControlPanel 
-        isExpanded={rightPanelExpanded}
-        onToggle={() => setRightPanelExpanded(!rightPanelExpanded)}
-      />
-
-      {/* Main Content */}
-      <div className="main-content">
-        <div className="stream-container">
-          {!isStreaming ? (
-            <div className="start-screen">
-              <div className="start-screen-content">
-                <div className="app-icon">🖥️</div>
-                <h1>WebRTC Screen Share</h1>
-                <p>Share your screen with advanced HUD controls</p>
-                <button 
-                  className="start-button"
-                  onClick={startScreenShare}
-                >
-                  <span className="button-icon">▶</span>
-                  Start Screen Sharing
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="video-display">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="screen-video"
-              />
-              <div className="video-overlay">
-                <div className="stream-indicator">
-                  <span className="indicator-dot"></span>
-                  <span>Streaming</span>
-                </div>
-                <button 
-                  className="stop-button"
-                  onClick={stopScreenShare}
-                >
-                  <span>■</span>
-                  Stop Sharing
-                </button>
-              </div>
-            </div>
-          )}
+      {/* Header Section */}
+      <header className="app-header">
+        <div className="logo-banner">
+          <div className="logo-placeholder">
+            <span className="logo-icon">🏢</span>
+            <span className="logo-text">Data Center Monitor</span>
+          </div>
         </div>
-      </div>
+        
+        {/* Tab Navigation */}
+        <div className="tab-navigation">
+          <div className="tab-scroll-container">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                className={`tab-button ${activeTab === tab ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* Tab Content */}
+      <main className="tab-content">
+        {renderTabContent()}
+      </main>
     </div>
   );
 }
