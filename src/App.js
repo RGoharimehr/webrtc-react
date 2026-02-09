@@ -7,6 +7,7 @@ import Plotting from './tabs/Plotting';
 import Configuration from './tabs/Configuration';
 import ResultsMapping from './tabs/ResultsMapping';
 import CFDAnalysis from './tabs/CFDAnalysis';
+import GraphsPanel from './components/GraphsPanel';
 
 function App() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -118,6 +119,9 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Graphs Panel - Right Side Column */}
+      <GraphsPanel />
 
       {/* HUD Overlay - Top Right */}
       <div className={`hud-overlay ${hudExpanded ? 'expanded' : 'minimized'}`}>
