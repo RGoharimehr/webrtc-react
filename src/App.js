@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
+
 import OperatingConditions from './tabs/OperatingConditions';
 import GeometricalDesign from './tabs/GeometricalDesign';
 import ResultsVisualization from './tabs/ResultsVisualization';
@@ -7,17 +8,42 @@ import Plotting from './tabs/Plotting';
 import Configuration from './tabs/Configuration';
 import ResultsMapping from './tabs/ResultsMapping';
 import CFDAnalysis from './tabs/CFDAnalysis';
+
 import GraphsPanel from './components/GraphsPanel';
 import DraggableResizable from './components/DraggableResizable';
 
 function App() {
-  const [activeTab, setActiveTab] = useState(() => {
-    return sessionStorage.getItem('activeTab') || 'Operating Conditions';
+  // Modes (order as requested)
+  const MODE_ORDER = ['SIMULATE', 'AI', 'BUILD'];
+
+  const MODE_TABS = {
+    SIMULATE: [
+      'Operating Conditions',
+      'Geometrical Design',
+      'Results Visualization',
+      'Plotting',
+      'CFD Analysis'
+    ],
+    AI: ['AI'],
+    BUILD: [
+      'Configuration',
+      'Results Mapping'
+    ]
+  };
+
+  const [activeMode, setActiveMode] = useState(() => {
+    return sessionStorage.getItem('activeMode') || 'SIMULATE';
   });
-  
+
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedMode = sessionStorage.getItem('activeMode') || 'SIMULATE';
+    return sessionStorage.getItem(`activeTab:${savedMode}`) || MODE_TABS[savedMode][0];
+  });
+
   const [screenStream, setScreenStream] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [hudExpanded, setHudExpanded] = useState(true);
+  const [plotsExpanded, setPlotsExpanded] = useState(true); // ✅ NEW: plots hide/show
   const videoRef = useRef(null);
 
   // Shared plotting state
@@ -29,9 +55,22 @@ function App() {
     humidity: false
   });
 
+  // Persist mode & tab per mode
   useEffect(() => {
-    sessionStorage.setItem('activeTab', activeTab);
-  }, [activeTab]);
+    sessionStorage.setItem('activeMode', activeMode);
+  }, [activeMode]);
+
+  useEffect(() => {
+    sessionStorage.setItem(`activeTab:${activeMode}`, activeTab);
+  }, [activeTab, activeMode]);
+
+  // When switching modes, restore that mode’s last tab (or default)
+  useEffect(() => {
+    const saved = sessionStorage.getItem(`activeTab:${activeMode}`);
+    const next = saved && MODE_TABS[activeMode].includes(saved) ? saved : MODE_TABS[activeMode][0];
+    setActiveTab(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode]);
 
   useEffect(() => {
     if (videoRef.current && screenStream) {
@@ -39,15 +78,7 @@ function App() {
     }
   }, [screenStream]);
 
-  const tabs = [
-    'Operating Conditions',
-    'Geometrical Design',
-    'Results Visualization',
-    'Plotting',
-    'Configuration',
-    'Results Mapping',
-    'CFD Analysis'
-  ];
+  const tabs = MODE_TABS[activeMode];
 
   const startScreenShare = async () => {
     try {
@@ -62,11 +93,10 @@ function App() {
           sampleRate: 44100
         }
       });
-      
+
       setScreenStream(stream);
       setIsStreaming(true);
 
-      // Handle user stopping the share via browser UI
       stream.getVideoTracks()[0].onended = () => {
         stopScreenShare();
       };
@@ -85,6 +115,17 @@ function App() {
   };
 
   const renderTabContent = () => {
+    if (activeMode === 'AI') {
+      return (
+        <div className="section">
+          <h2 className="section-title">AI</h2>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+            AI workflow UI placeholder (surrogate, optimization, agent, etc.)
+          </div>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'Operating Conditions':
         return <OperatingConditions />;
@@ -93,13 +134,18 @@ function App() {
       case 'Results Visualization':
         return <ResultsVisualization />;
       case 'Plotting':
-        return <Plotting plottingVariables={plottingVariables} setPlottingVariables={setPlottingVariables} />;
+        return (
+          <Plotting
+            plottingVariables={plottingVariables}
+            setPlottingVariables={setPlottingVariables}
+          />
+        );
+      case 'CFD Analysis':
+        return <CFDAnalysis />;
       case 'Configuration':
         return <Configuration />;
       case 'Results Mapping':
         return <ResultsMapping />;
-      case 'CFD Analysis':
-        return <CFDAnalysis />;
       default:
         return <OperatingConditions />;
     }
@@ -107,15 +153,10 @@ function App() {
 
   return (
     <div className="App">
-      {/* WebRTC Stream Background */}
+      {/* WebRTC Stream Background (UNCHANGED) */}
       <div className="stream-background">
         {isStreaming ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="stream-video"
-          />
+          <video ref={videoRef} autoPlay playsInline className="stream-video" />
         ) : (
           <div className="no-stream-overlay">
             <div className="start-prompt">
@@ -130,29 +171,42 @@ function App() {
         )}
       </div>
 
-      {/* Graphs Panel - Left Side - Draggable & Resizable */}
+      {/* Left Panel (Plots) */}
       <DraggableResizable
         initialX={20}
         initialY={20}
         initialWidth={240}
         initialHeight={600}
         minWidth={200}
-        minHeight={400}
+        minHeight={220}
         maxWidth={400}
         maxHeight={900}
         title="Live Metrics"
       >
-        <GraphsPanel plottingVariables={plottingVariables} />
+        {/* ✅ Hide/Show button like dashboard */}
+        <div className="panel-controls-inline">
+          <button
+            className="hud-button"
+            onClick={() => setPlotsExpanded(!plotsExpanded)}
+            title={plotsExpanded ? "Hide" : "Show"}
+          >
+            {plotsExpanded ? '− Hide' : '+ Show'}
+          </button>
+        </div>
+
+        {plotsExpanded && (
+          <GraphsPanel plottingVariables={plottingVariables} />
+        )}
       </DraggableResizable>
 
-      {/* HUD Dashboard - Right Side - Draggable & Resizable */}
+      {/* Right Dashboard */}
       <DraggableResizable
         initialX={window.innerWidth - 300}
         initialY={20}
         initialWidth={280}
         initialHeight={600}
         minWidth={250}
-        minHeight={400}
+        minHeight={240}
         maxWidth={500}
         maxHeight={900}
         title="Dashboard Control"
@@ -164,18 +218,33 @@ function App() {
                 ■ Stop
               </button>
             )}
-            <button 
-              className="hud-button" 
+            <button
+              className="hud-button"
               onClick={() => setHudExpanded(!hudExpanded)}
               title={hudExpanded ? "Minimize" : "Expand"}
             >
               {hudExpanded ? '− Minimize' : '+ Expand'}
             </button>
           </div>
-          
+
           {hudExpanded && (
             <>
-              {/* Tab Navigation */}
+              {/* MODE BAR */}
+              <div className="hud-mode-nav">
+                <div className="hud-mode-scroll">
+                  {MODE_ORDER.map((mode) => (
+                    <button
+                      key={mode}
+                      className={`hud-mode-button ${activeMode === mode ? 'active' : ''}`}
+                      onClick={() => setActiveMode(mode)}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* SUB-TABS */}
               <div className="hud-tab-navigation">
                 <div className="hud-tab-scroll">
                   {tabs.map((tab) => (
@@ -190,7 +259,7 @@ function App() {
                 </div>
               </div>
 
-              {/* Tab Content */}
+              {/* CONTENT */}
               <div className="hud-content">
                 {renderTabContent()}
               </div>
@@ -198,6 +267,24 @@ function App() {
           )}
         </div>
       </DraggableResizable>
+
+      {/* ✅ Key Metrics fixed to BOTTOM OF VIEWPORT */}
+      <div className="key-metrics-viewport">
+        <div className="kms-item">
+          <span className="kms-label">PUE</span>
+          <span className="kms-value">1.42</span>
+        </div>
+        <div className="kms-sep" />
+        <div className="kms-item">
+          <span className="kms-label">Tmax</span>
+          <span className="kms-value">68.5°C</span>
+        </div>
+        <div className="kms-sep" />
+        <div className="kms-item">
+          <span className="kms-label">Pcond</span>
+          <span className="kms-value">N/A</span>
+        </div>
+      </div>
     </div>
   );
 }

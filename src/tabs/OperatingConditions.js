@@ -55,29 +55,10 @@ const OperatingConditions = () => {
 
   return (
     <div>
-      {/* Key Metrics Section */}
-      <div className="section">
-        <h2 className="section-title">Key Metrics</h2>
-        <div className="metrics-grid">
-          <div className="metric-card">
-            <div className="metric-label">PUE (Power Usage Effectiveness)</div>
-            <div className="metric-value">1.42</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Maximum Case Temperature</div>
-            <div className="metric-value">68.5°C</div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-label">Condenser Pressure</div>
-            <div className="metric-value invalid">N/A</div>
-          </div>
-        </div>
-      </div>
-
       {/* Dynamic Input Controls */}
       <div className="section">
         <h2 className="section-title">Dynamic Input Parameters</h2>
-        
+
         <div className="input-row">
           <label className="input-label">Ambient Temperature [°C]:</label>
           <div className="input-control">
@@ -175,7 +156,7 @@ const OperatingConditions = () => {
             ANSYS SimAI Prediction
           </button>
         </div>
-        
+
         <div style={{ marginTop: '20px' }}>
           <label className="input-label">Results Category:</label>
           <select style={{ width: '300px', marginLeft: '16px' }}>
@@ -190,11 +171,7 @@ const OperatingConditions = () => {
       {/* Logs */}
       <div className="logs-container">
         <div className="logs-title">Simulation Logs</div>
-        <textarea
-          className="logs-textarea"
-          value={logs}
-          readOnly
-        />
+        <textarea className="logs-textarea" value={logs} readOnly />
       </div>
     </div>
   );
