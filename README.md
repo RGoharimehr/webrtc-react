@@ -1,16 +1,29 @@
-# WebRTC React - Data Center Monitoring Dashboard
+# WebRTC React - Data Center Monitoring Dashboard with HUD Overlay
 
-A modern data center monitoring and control dashboard with an industrial dark theme built with React.
+A modern data center monitoring and control dashboard with WebRTC screen sharing and an industrial dark theme HUD overlay built with React.
 
-![Data Center Dashboard](https://github.com/user-attachments/assets/0add78de-4e01-40c2-86f9-43e368bfe7be)
+![HUD Overlay Expanded](https://github.com/user-attachments/assets/59fedd2c-a2f7-4143-9982-bffd54652f58)
 
 ## Features
+
+🖥️ **Full-Screen WebRTC Streaming**
+- Share entire screen or specific windows
+- High-quality video streaming with audio capture
+- Stream fills the entire window as background
+- Start/stop controls integrated into HUD
+
+🎮 **Compact HUD Overlay**
+- Floating control panel in top-right corner
+- Minimize/expand functionality (+ / - buttons)
+- Semi-transparent with backdrop blur effect
+- Stays on top of the video stream
+- All controls accessible without blocking the stream
 
 🏢 **Data Center Monitoring Theme**
 - Dark industrial theme (#1a1a1a, #2d2d2d, #363636)
 - Lime green accent color (#86ef47) for emphasis
 - Modern, clean typography
-- Full-height layout with fixed header
+- Compact design optimized for overlay display
 
 📊 **7 Functional Control Tabs**
 
@@ -108,26 +121,29 @@ This will:
 
 ## Usage
 
-1. **Navigate Between Tabs**
-   - Click on any tab in the header navigation bar
-   - Tab selection persists across page refreshes
-   - Each tab provides specific controls for different aspects
+1. **Start Screen Sharing**
+   - Click the "▶ Start Screen Sharing" button in the center
+   - Select the screen or window you want to share
+   - Click "Share" in the browser dialog
+   - Your screen will fill the entire window
 
-2. **Adjust Parameters**
-   - Use sliders for continuous values (temperature, pressure, etc.)
-   - Real-time value display next to each slider
+2. **Use the HUD Controls**
+   - HUD panel appears in the top-right corner
+   - Click tabs to switch between different control sections
+   - Use the "−" button to minimize the HUD to just the title bar
+   - Use the "+" button to expand the HUD again
+   - Click the "■" button to stop screen sharing
+
+3. **Adjust Parameters**
+   - All controls work the same as before, just in compact form
+   - Sliders show real-time values
    - Dropdowns for discrete selections
-   - Checkboxes for boolean options
+   - Logs track all operations
 
-3. **Monitor Logs**
-   - Each tab with actions has a logs section at the bottom
-   - Timestamps show when actions occur
-   - Read-only text area for log history
-
-4. **Collapsible Sections**
-   - Click section headers to expand/collapse
-   - Saves screen space for complex configurations
-   - Visual indicator (▼) shows expand/collapse state
+4. **HUD States**
+   - **Expanded**: 420px width, shows all controls and tabs
+   - **Minimized**: 280px width, shows only title bar
+   - **Semi-transparent**: 95% opacity with backdrop blur for visibility over the stream
 
 ## Color Coding
 
@@ -268,20 +284,30 @@ node verify-setup.js
 
 ## Screenshots
 
-### Main Interface - Operating Conditions Tab
-![Data Center Dashboard](https://github.com/user-attachments/assets/0add78de-4e01-40c2-86f9-43e368bfe7be)
+### HUD Overlay - Expanded State
+![HUD Expanded](https://github.com/user-attachments/assets/59fedd2c-a2f7-4143-9982-bffd54652f58)
 
-The main interface features:
-- Fixed header with logo and horizontal tab navigation
+The HUD overlay in expanded state showing:
+- All 7 control tabs in compact vertical layout
 - Key metrics cards with color-coded values
-- Dynamic parameter sliders with real-time value display
-- Simulation control buttons with clear visual hierarchy
-- Logs area for tracking all operations
+- Dynamic parameter sliders with real-time displays
+- Simulation control buttons
+- Semi-transparent design with backdrop blur
+
+### HUD Overlay - Minimized State
+![HUD Minimized](https://github.com/user-attachments/assets/0bc4a86e-8381-4dc7-8e62-4eee8e324e04)
+
+The HUD minimized to just the title bar:
+- Compact 280px width
+- "Data Center Control" title visible
+- "+" button to expand again
+- Minimal obstruction of the video stream
 
 ## Technology Stack
 
 - **React 18** - Modern React with hooks
-- **CSS3** - Dark theme with custom properties
+- **WebRTC** - Screen sharing via `getDisplayMedia`
+- **CSS3** - Dark theme with backdrop-filter blur effects
 - **JavaScript ES6+** - Modern syntax and features
 - **Session Storage** - Tab persistence across refreshes
 
