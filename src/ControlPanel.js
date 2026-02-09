@@ -113,6 +113,7 @@ const ControlPanel = ({ isExpanded, onToggle }) => {
           <div className="control-section">
             <h4>Quick Actions</h4>
             <div className="action-buttons">
+              {/* Placeholder buttons - functionality to be implemented */}
               <button className="action-btn">
                 <span>📸</span>
                 <span>Screenshot</span>

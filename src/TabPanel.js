@@ -3,6 +3,8 @@ import './TabPanel.css';
 
 const TabPanel = ({ isExpanded, onToggle }) => {
   const [activeTab, setActiveTab] = useState('Operating Conditions');
+  const [simulationProgress, setSimulationProgress] = useState(0);
+  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
 
   const tabs = [
     'Operating Conditions',
@@ -61,6 +63,7 @@ const TabPanel = ({ isExpanded, onToggle }) => {
           <div className="tab-content">
             <h3>Results Visualization</h3>
             <div className="viz-controls">
+              {/* Placeholder buttons - functionality to be implemented */}
               <button className="viz-button">Show Contours</button>
               <button className="viz-button">Show Vectors</button>
               <button className="viz-button">Show Streamlines</button>
@@ -110,6 +113,7 @@ const TabPanel = ({ isExpanded, onToggle }) => {
           <div className="tab-content">
             <h3>Results Mapping</h3>
             <div className="mapping-controls">
+              {/* Placeholder buttons - functionality to be implemented */}
               <button className="map-button">Export Data</button>
               <button className="map-button">Generate Report</button>
               <button className="map-button">Save Configuration</button>
@@ -117,15 +121,54 @@ const TabPanel = ({ isExpanded, onToggle }) => {
           </div>
         );
       case 'CFD':
+        const handleRunSimulation = () => {
+          setIsSimulationRunning(true);
+          // Simulate progress (in real app, this would be actual simulation progress)
+          let progress = 0;
+          const interval = setInterval(() => {
+            progress += 10;
+            setSimulationProgress(progress);
+            if (progress >= 100) {
+              clearInterval(interval);
+              setIsSimulationRunning(false);
+            }
+          }, 500);
+        };
+
+        const handleStopSimulation = () => {
+          setIsSimulationRunning(false);
+          setSimulationProgress(0);
+        };
+
         return (
           <div className="tab-content">
             <h3>CFD Analysis</h3>
             <div className="cfd-controls">
-              <button className="cfd-button">Run Simulation</button>
-              <button className="cfd-button">Stop Simulation</button>
+              <button 
+                className="cfd-button" 
+                onClick={handleRunSimulation}
+                disabled={isSimulationRunning}
+              >
+                Run Simulation
+              </button>
+              <button 
+                className="cfd-button" 
+                onClick={handleStopSimulation}
+                disabled={!isSimulationRunning}
+              >
+                Stop Simulation
+              </button>
               <div className="progress-bar">
-                <div className="progress-fill" style={{ width: '0%' }}></div>
+                <div 
+                  className="progress-fill" 
+                  style={{ width: `${simulationProgress}%` }}
+                ></div>
               </div>
+              {simulationProgress > 0 && (
+                <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                  {simulationProgress}% Complete
+                </div>
+              )}
             </div>
           </div>
         );
