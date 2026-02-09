@@ -1,8 +1,8 @@
-# WebRTC React - Data Center Monitoring Dashboard with HUD Overlay
+# WebRTC React - Data Center Monitoring Dashboard with iOS 16 Glassmorphism
 
-A modern data center monitoring and control dashboard with WebRTC screen sharing and an industrial dark theme HUD overlay built with React.
+A modern data center monitoring and control dashboard with WebRTC screen sharing, iOS 16-style glassmorphism effects, and live metrics visualization built with React.
 
-![HUD Overlay Expanded](https://github.com/user-attachments/assets/59fedd2c-a2f7-4143-9982-bffd54652f58)
+![iOS Glassmorphism with Graphs](https://github.com/user-attachments/assets/a3a3d02f-0c95-460d-8344-b261e4ee73c8)
 
 ## Features
 
@@ -12,18 +12,26 @@ A modern data center monitoring and control dashboard with WebRTC screen sharing
 - Stream fills the entire window as background
 - Start/stop controls integrated into HUD
 
+✨ **iOS 16-Style Glassmorphism**
+- Ultra-modern glass-like tinted panels
+- 40px backdrop blur with 180% saturation
+- Semi-transparent overlays (70% opacity)
+- Subtle inset glow effects
+- Matches iOS 16 design language
+
+📊 **Live Metrics Panel**
+- Separate always-visible graphs panel on right side
+- Real-time temperature and power consumption charts
+- SVG-based smooth line graphs with gradient fills
+- Current values and trend indicators
+- Glass-tinted backgrounds (no white backgrounds)
+
 🎮 **Compact HUD Overlay**
 - Floating control panel in top-right corner
 - Minimize/expand functionality (+ / - buttons)
 - Semi-transparent with backdrop blur effect
 - Stays on top of the video stream
 - All controls accessible without blocking the stream
-
-🏢 **Data Center Monitoring Theme**
-- Dark industrial theme (#1a1a1a, #2d2d2d, #363636)
-- Lime green accent color (#86ef47) for emphasis
-- Modern, clean typography
-- Compact design optimized for overlay display
 
 📊 **7 Functional Control Tabs**
 
@@ -127,23 +135,31 @@ This will:
    - Click "Share" in the browser dialog
    - Your screen will fill the entire window
 
-2. **Use the HUD Controls**
+2. **View Live Metrics**
+   - Graphs panel appears automatically on the right side
+   - Shows real-time temperature and power consumption
+   - Always visible for continuous monitoring
+   - Glass-tinted backgrounds for iOS 16 aesthetic
+
+3. **Use the HUD Controls**
    - HUD panel appears in the top-right corner
    - Click tabs to switch between different control sections
    - Use the "−" button to minimize the HUD to just the title bar
    - Use the "+" button to expand the HUD again
    - Click the "■" button to stop screen sharing
 
-3. **Adjust Parameters**
+4. **Adjust Parameters**
    - All controls work the same as before, just in compact form
    - Sliders show real-time values
    - Dropdowns for discrete selections
    - Logs track all operations
 
-4. **HUD States**
-   - **Expanded**: 420px width, shows all controls and tabs
-   - **Minimized**: 280px width, shows only title bar
-   - **Semi-transparent**: 95% opacity with backdrop blur for visibility over the stream
+5. **iOS 16 Glassmorphism**
+   - Both panels use ultra-modern glass effects
+   - 40px backdrop blur with 180% saturation
+   - Tinted semi-transparent backgrounds
+   - Subtle borders and inset glows
+   - Perfectly readable over any stream content
 
 ## Color Coding
 
@@ -284,30 +300,29 @@ node verify-setup.js
 
 ## Screenshots
 
-### HUD Overlay - Expanded State
-![HUD Expanded](https://github.com/user-attachments/assets/59fedd2c-a2f7-4143-9982-bffd54652f58)
+### iOS 16 Glassmorphism with Live Metrics
+![iOS Glassmorphism](https://github.com/user-attachments/assets/a3a3d02f-0c95-460d-8344-b261e4ee73c8)
 
-The HUD overlay in expanded state showing:
-- All 7 control tabs in compact vertical layout
-- Key metrics cards with color-coded values
-- Dynamic parameter sliders with real-time displays
-- Simulation control buttons
-- Semi-transparent design with backdrop blur
-
-### HUD Overlay - Minimized State
-![HUD Minimized](https://github.com/user-attachments/assets/0bc4a86e-8381-4dc7-8e62-4eee8e324e04)
-
-The HUD minimized to just the title bar:
-- Compact 280px width
-- "Data Center Control" title visible
-- "+" button to expand again
-- Minimal obstruction of the video stream
+The complete interface featuring:
+- **Left**: Data Center Control HUD with iOS 16 glass effect
+  - All 7 control tabs in compact vertical layout
+  - Key metrics cards with color-coded values
+  - Dynamic parameter sliders with real-time displays
+  - Simulation control buttons
+- **Right**: Live Metrics panel with glass-tinted graphs
+  - Temperature distribution chart with gradient fill
+  - Power consumption chart with trend indicators
+  - Current values and trend metrics
+  - Always visible for continuous monitoring
+- **Background**: WebRTC stream with start prompt
+- **Glass Effect**: 40px backdrop blur, 180% saturation, tinted overlays
 
 ## Technology Stack
 
 - **React 18** - Modern React with hooks
 - **WebRTC** - Screen sharing via `getDisplayMedia`
-- **CSS3** - Dark theme with backdrop-filter blur effects
+- **CSS3** - iOS 16 glassmorphism with backdrop-filter and saturate effects
+- **SVG** - Smooth line charts with gradient fills
 - **JavaScript ES6+** - Modern syntax and features
 - **Session Storage** - Tab persistence across refreshes
 
