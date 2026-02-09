@@ -1,6 +1,37 @@
 # WebRTC React
 
-A simple WebRTC video streaming application built with React.
+A modern WebRTC screen sharing application with an Apple-inspired HUD interface built with React.
+
+## Features
+
+🎨 **Apple-Inspired UI Design**
+- Glassmorphism effects with backdrop blur
+- Smooth animations and transitions
+- Modern, clean interface
+
+🖥️ **Screen Sharing**
+- Share entire screen or specific windows
+- High-quality video streaming
+- Audio capture support
+
+📊 **Advanced Control Panels**
+
+### Left Panel (Controls)
+Expandable HUD panel with 7 functional tabs:
+- **Operating Conditions** - Temperature, pressure, and flow rate controls
+- **Geometrical Design** - Diameter, length, and shape configuration
+- **Results Visualization** - Contours, vectors, and streamlines display
+- **Plotting** - Temperature distribution, velocity profile, and pressure maps
+- **Configuration** - Solver type and turbulence model settings
+- **Results Mapping** - Data export and report generation
+- **CFD** - Simulation controls and progress tracking
+
+### Right Panel (Display)
+Expandable HUD panel for display settings:
+- **Camera Views** - Main and overlay camera toggles
+- **Visibility** - Grid view and annotations controls
+- **Stream Quality** - FPS (30/60/120) and quality (Low/Medium/High/Ultra) settings
+- **Quick Actions** - Screenshot, record, and reset view buttons
 
 ## Prerequisites
 
@@ -162,6 +193,44 @@ node verify-setup.js
 - Local video streaming using WebRTC
 - React hooks for state management
 - Simple and clean UI
+
+## Screenshots
+
+### Main Interface
+![WebRTC Screen Share UI](https://github.com/user-attachments/assets/94bd1794-ebe4-4f83-add4-4fbc074fa805)
+
+The main interface features:
+- Left HUD panel with 7 expandable tabs for controls
+- Right HUD panel for camera and display settings
+- Centered start screen with screen sharing button
+
+### Tab Switching
+![Results Visualization Tab](https://github.com/user-attachments/assets/cce8a075-fb51-4241-acd1-b2946901aa3c)
+
+Tabs dynamically switch content with smooth animations, showing different control options for each category.
+
+## Usage
+
+1. **Start Screen Sharing**
+   - Click the "Start Screen Sharing" button in the center
+   - Select the screen or window you want to share
+   - Click "Share" in the browser dialog
+
+2. **Use Control Panels**
+   - Click on the left panel to expand/collapse controls
+   - Switch between tabs to access different settings
+   - Click on the right panel to adjust display settings
+
+3. **Stop Sharing**
+   - Click the "Stop Sharing" button that appears during streaming
+   - Or use the browser's native stop sharing button
+
+## Technology Stack
+
+- **React 18** - Modern React with hooks
+- **WebRTC** - Screen sharing via `getDisplayMedia`
+- **CSS3** - Glassmorphism effects with backdrop-filter
+- **Modern JavaScript** - ES6+ features
 
 ## License
 
