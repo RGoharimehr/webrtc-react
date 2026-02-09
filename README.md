@@ -1,37 +1,80 @@
-# WebRTC React
+# WebRTC React - Data Center Monitoring Dashboard
 
-A modern WebRTC screen sharing application with an Apple-inspired HUD interface built with React.
+A modern data center monitoring and control dashboard with an industrial dark theme built with React.
+
+![Data Center Dashboard](https://github.com/user-attachments/assets/0add78de-4e01-40c2-86f9-43e368bfe7be)
 
 ## Features
 
-🎨 **Apple-Inspired UI Design**
-- Glassmorphism effects with backdrop blur
-- Smooth animations and transitions
-- Modern, clean interface
+🏢 **Data Center Monitoring Theme**
+- Dark industrial theme (#1a1a1a, #2d2d2d, #363636)
+- Lime green accent color (#86ef47) for emphasis
+- Modern, clean typography
+- Full-height layout with fixed header
 
-🖥️ **Screen Sharing**
-- Share entire screen or specific windows
-- High-quality video streaming
-- Audio capture support
+📊 **7 Functional Control Tabs**
 
-📊 **Advanced Control Panels**
+### 1. Operating Conditions
+- **Key Metrics Display**: PUE, Maximum Case Temperature, Condenser Pressure
+- **Dynamic Parameters**: Ambient Temperature, Delta Temperature, Fan RPM, Heat Load, Humidity
+- **Simulation Controls**: Start/Stop Transient, Solve Steady State, ANSYS SimAI Prediction
+- **Real-time Logs**: Track all parameter changes and simulation events
 
-### Left Panel (Controls)
-Expandable HUD panel with 7 functional tabs:
-- **Operating Conditions** - Temperature, pressure, and flow rate controls
-- **Geometrical Design** - Diameter, length, and shape configuration
-- **Results Visualization** - Contours, vectors, and streamlines display
-- **Plotting** - Temperature distribution, velocity profile, and pressure maps
-- **Configuration** - Solver type and turbulence model settings
-- **Results Mapping** - Data export and report generation
-- **CFD** - Simulation controls and progress tracking
+### 2. Geometrical Design
+- **Geometric Parameters**: Server dimensions, aisle width, ceiling height, rack count
+- **Layout Configuration**: Rack arrangement types, floor type selection
+- **Static Input Controls**: Sliders for precise dimensional adjustments
 
-### Right Panel (Display)
-Expandable HUD panel for display settings:
-- **Camera Views** - Main and overlay camera toggles
-- **Visibility** - Grid view and annotations controls
-- **Stream Quality** - FPS (30/60/120) and quality (Low/Medium/High/Ultra) settings
-- **Quick Actions** - Screenshot, record, and reset view buttons
+### 3. Results Visualization
+- **Property Selection**: Temperature, Pressure, Velocity, Humidity
+- **Colormap Options**: Jet, Rainbow, Hot, Cool, Viridis
+- **Manual Bounds**: Optional min/max value controls
+- **Color Legend**: Dynamic gradient display with bound values
+
+### 4. Plotting
+- **Y-Axis Variables**: Temperature, Pressure, Velocity, Power, Humidity
+- **X-Axis Selection**: Time, Iteration, Distance
+- **Plot Management**: Add plots, clear all plots
+- **Visual Feedback**: Warning message when no data available
+- **Plot Display**: Light-themed plot area with gridlines and legends
+
+### 5. Configuration
+- **Flownex Integration**: Project file and IO directory selection
+- **Auto-solve Option**: Solve on input change
+- **Data Interval**: Adjustable from 0.25s to 1.5s
+- **API Testing**: Open/close project, connection status
+
+### 6. Results Mapping
+- **Workflow Sections**: Three numbered workflow steps
+- **Prim Override**: Target path configuration
+- **Config Generation**: One-click mapping file creation
+- **Project I/O**: Import and export functionality
+
+### 7. CFD Analysis
+- **ANSYS FLUENT**: Ambient temp, delta temp, fan RPM dropdowns
+- **ANSYS SimAI**: 
+  - Prediction selection and visualization
+  - Parameter sliders: Ambient (10-60), Delta (10-60), Fan RPM (100-1000), Heat Load (0-250kW)
+  - Generate prediction button
+
+## Technical Features
+
+✅ **State Management**
+- Session storage for tab persistence
+- Local state management with React hooks
+- Real-time parameter updates
+
+✅ **User Interface**
+- Collapsible sections for space efficiency
+- Color-coded status indicators
+- Disabled state handling
+- Smooth tab transitions
+- Real-time value displays on sliders
+
+✅ **Responsive Design**
+- Fixed header with scrollable content
+- Adaptive layouts
+- Minimum width: 1024px recommended
 
 ## Prerequisites
 
@@ -63,6 +106,35 @@ This will:
 - Start the development server
 - Open the application in your default browser at `http://localhost:3000`
 
+## Usage
+
+1. **Navigate Between Tabs**
+   - Click on any tab in the header navigation bar
+   - Tab selection persists across page refreshes
+   - Each tab provides specific controls for different aspects
+
+2. **Adjust Parameters**
+   - Use sliders for continuous values (temperature, pressure, etc.)
+   - Real-time value display next to each slider
+   - Dropdowns for discrete selections
+   - Checkboxes for boolean options
+
+3. **Monitor Logs**
+   - Each tab with actions has a logs section at the bottom
+   - Timestamps show when actions occur
+   - Read-only text area for log history
+
+4. **Collapsible Sections**
+   - Click section headers to expand/collapse
+   - Saves screen space for complex configurations
+   - Visual indicator (▼) shows expand/collapse state
+
+## Color Coding
+
+- **Lime Green (#86ef47)**: Valid values, active states, section titles
+- **Blue (#0050E0)**: Active tab, primary actions
+- **Red (#ff3333)**: Invalid values, errors, N/A states
+- **Yellow (#ffcc00)**: Warnings, alerts
 
 ## Available Scripts
 
@@ -196,41 +268,22 @@ node verify-setup.js
 
 ## Screenshots
 
-### Main Interface
-![WebRTC Screen Share UI](https://github.com/user-attachments/assets/94bd1794-ebe4-4f83-add4-4fbc074fa805)
+### Main Interface - Operating Conditions Tab
+![Data Center Dashboard](https://github.com/user-attachments/assets/0add78de-4e01-40c2-86f9-43e368bfe7be)
 
 The main interface features:
-- Left HUD panel with 7 expandable tabs for controls
-- Right HUD panel for camera and display settings
-- Centered start screen with screen sharing button
-
-### Tab Switching
-![Results Visualization Tab](https://github.com/user-attachments/assets/cce8a075-fb51-4241-acd1-b2946901aa3c)
-
-Tabs dynamically switch content with smooth animations, showing different control options for each category.
-
-## Usage
-
-1. **Start Screen Sharing**
-   - Click the "Start Screen Sharing" button in the center
-   - Select the screen or window you want to share
-   - Click "Share" in the browser dialog
-
-2. **Use Control Panels**
-   - Click on the left panel to expand/collapse controls
-   - Switch between tabs to access different settings
-   - Click on the right panel to adjust display settings
-
-3. **Stop Sharing**
-   - Click the "Stop Sharing" button that appears during streaming
-   - Or use the browser's native stop sharing button
+- Fixed header with logo and horizontal tab navigation
+- Key metrics cards with color-coded values
+- Dynamic parameter sliders with real-time value display
+- Simulation control buttons with clear visual hierarchy
+- Logs area for tracking all operations
 
 ## Technology Stack
 
 - **React 18** - Modern React with hooks
-- **WebRTC** - Screen sharing via `getDisplayMedia`
-- **CSS3** - Glassmorphism effects with backdrop-filter
-- **Modern JavaScript** - ES6+ features
+- **CSS3** - Dark theme with custom properties
+- **JavaScript ES6+** - Modern syntax and features
+- **Session Storage** - Tab persistence across refreshes
 
 ## License
 
