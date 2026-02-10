@@ -13,7 +13,7 @@ import GraphsPanel from "./components/GraphsPanel";
 import DraggableResizable from "./components/DraggableResizable";
 
 /* =========================
-   Legend config (NEW)
+   Legend config
    ========================= */
 const LEGEND_VARIABLES = [
   { id: "temperature", label: "Temperature", units: "°C", min: 20, max: 90 },
@@ -41,30 +41,28 @@ const LEGEND_PRESETS = [
     gradient:
       "linear-gradient(180deg, #000004, #3b0f70, #8c2981, #de4968, #fe9f6d, #fcfdbf)",
   },
-
   {
     id: "plasma",
     name: "Plasma",
     gradient:
-     "linear-gradient(180deg, #0d0887, #7e03a8, #cc4678, #f89441, #f0f921)",
+      "linear-gradient(180deg, #0d0887, #7e03a8, #cc4678, #f89441, #f0f921)",
   },
   {
     id: "turbo",
     name: "Turbo",
     gradient:
-     "linear-gradient(180deg, #30123b, #4456c7, #2ab9a1, #aadb32, #f9e721)",
+      "linear-gradient(180deg, #30123b, #3b4cc0, #2ab9a1, #aadb32, #e6550d, #7f0000)",
   },
   {
     id: "coolwarm",
     name: "Cool–Warm",
     gradient:
-     "linear-gradient(180deg, #3b4cc0, #788bff, #e6e6e6, #f2906b, #b40426)",
+      "linear-gradient(180deg, #3b4cc0, #788bff, #e6e6e6, #f2906b, #b40426)",
   },
   {
-   id: "gray",
-   name: "Grayscale",
-   gradient:
-     "linear-gradient(180deg, #000000, #ffffff)",
+    id: "gray",
+    name: "Grayscale",
+    gradient: "linear-gradient(180deg, #000000, #ffffff)",
   },
 ];
 
@@ -83,6 +81,20 @@ function App() {
     BUILD: ["Configuration", "Results Mapping"],
   };
 
+  // WebRTC refs
+  const pcRef = useRef(null);
+  const wsRef = useRef(null);
+  const videoRef = useRef(null);
+
+  // Streaming state
+  const [screenStream, setScreenStream] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  // Docks
+  const [hudExpanded, setHudExpanded] = useState(true);
+  const [plotsExpanded, setPlotsExpanded] = useState(true);
+
+  // Mode/tab state
   const [activeMode, setActiveMode] = useState(() => {
     return sessionStorage.getItem("activeMode") || "SIMULATE";
   });
@@ -95,15 +107,6 @@ function App() {
     );
   });
 
-  const [screenStream, setScreenStream] = useState(null);
-  const [isStreaming, setIsStreaming] = useState(false);
-
-  // Docks
-  const [hudExpanded, setHudExpanded] = useState(true);
-  const [plotsExpanded, setPlotsExpanded] = useState(true);
-
-  const videoRef = useRef(null);
-
   // Shared plotting state
   const [plottingVariables, setPlottingVariables] = useState({
     temperature: true,
@@ -113,12 +116,10 @@ function App() {
     humidity: false,
   });
 
-  /* =========================
-     Legend state (NEW)
-     ========================= */
+  // Legend state
   const [legendOpen, setLegendOpen] = useState(false);
   const [legendVar, setLegendVar] = useState("temperature");
-  const [legendPreset, setLegendPreset] = useState("viridis");
+  const [legendPreset, setLegendPreset] = useState("turbo");
 
   const legendVarObj =
     LEGEND_VARIABLES.find((v) => v.id === legendVar) || LEGEND_VARIABLES[0];
@@ -147,44 +148,135 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMode]);
 
+  // Attach stream to video
   useEffect(() => {
-    if (videoRef.current && screenStream) {
-      videoRef.current.srcObject = screenStream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = screenStream || null;
     }
   }, [screenStream]);
 
-  const tabs = MODE_TABS[activeMode];
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      try {
+        if (pcRef.current) pcRef.current.close();
+        if (wsRef.current) wsRef.current.close();
+      } catch {}
+    };
+  }, []);
 
-  const startScreenShare = async () => {
+  const disconnectOmniverseStream = () => {
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: "always", displaySurface: "monitor" },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100,
-        },
-      });
+      if (pcRef.current) pcRef.current.close();
+      if (wsRef.current) wsRef.current.close();
+    } catch {}
 
-      setScreenStream(stream);
-      setIsStreaming(true);
-
-      stream.getVideoTracks()[0].onended = () => {
-        stopScreenShare();
-      };
-    } catch (error) {
-      console.error("Error starting screen share:", error);
-      alert("Failed to start screen sharing: " + error.message);
-    }
-  };
-
-  const stopScreenShare = () => {
-    if (screenStream) {
-      screenStream.getTracks().forEach((track) => track.stop());
-    }
+    pcRef.current = null;
+    wsRef.current = null;
     setScreenStream(null);
     setIsStreaming(false);
   };
+
+  const connectOmniverseStream = async () => {
+    // Use env if you have it; otherwise your IP
+    const host = process.env.REACT_APP_OV_SIGNAL_HOST || "153.104.44.62";
+    const port = process.env.REACT_APP_OV_SIGNAL_PORT || "49100";
+    const proto = process.env.REACT_APP_OV_SIGNAL_PROTO || "ws";
+
+    const wsUrl = `${proto}://${host}:${port}`;
+    console.log("Connecting to Omniverse signaling:", wsUrl);
+
+    // reset any old session
+    disconnectOmniverseStream();
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    pcRef.current = pc;
+
+    pc.ontrack = (event) => {
+      const [stream] = event.streams;
+      if (stream) {
+        setScreenStream(stream);
+        setIsStreaming(true);
+      }
+    };
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ candidate: e.candidate }));
+      }
+    };
+
+    ws.onopen = () => {
+      console.log("Signaling connected.");
+      // Some Kit builds auto-send an SDP offer.
+      // If YOUR server requires a kickoff message, uncomment ONE of these:
+      // ws.send(JSON.stringify({ action: "request_offer" }));
+      // ws.send(JSON.stringify({ type: "request_offer" }));
+    };
+
+    ws.onmessage = async (evt) => {
+      let msg;
+      try {
+        msg = JSON.parse(evt.data);
+      } catch (e) {
+        console.warn("Non-JSON signaling message:", evt.data);
+        return;
+      }
+
+      console.log("Signal:", msg);
+
+      // Common patterns:
+      // 1) { sdp: { type: "offer", sdp: "..." } }
+      // 2) { type: "offer", sdp: "..." }
+      // 3) { candidate: { ... } } or { type:"candidate", candidate:{...} }
+
+      try {
+        if (msg.sdp && msg.sdp.type) {
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          ws.send(JSON.stringify({ sdp: pc.localDescription }));
+          return;
+        }
+
+        if (msg.type === "offer" && msg.sdp) {
+          await pc.setRemoteDescription(
+            new RTCSessionDescription({ type: "offer", sdp: msg.sdp })
+          );
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          ws.send(JSON.stringify({ type: "answer", sdp: pc.localDescription.sdp }));
+          return;
+        }
+
+        const cand = msg.candidate || (msg.type === "candidate" ? msg.candidate : null);
+        if (cand) {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+          return;
+        }
+      } catch (err) {
+        console.error("Error handling signaling message:", err);
+      }
+    };
+
+    ws.onerror = (e) => {
+      console.error("WebSocket error:", e);
+      alert(`Failed to connect to Omniverse signaling: ${wsUrl}`);
+      disconnectOmniverseStream();
+    };
+
+    ws.onclose = () => {
+      console.log("Signaling closed.");
+      disconnectOmniverseStream();
+    };
+  };
+
+  const tabs = MODE_TABS[activeMode];
 
   const renderTabContent = () => {
     if (activeMode === "AI") {
@@ -228,15 +320,24 @@ function App() {
       {/* Background Stream */}
       <div className="stream-background">
         {isStreaming ? (
-          <video ref={videoRef} autoPlay playsInline className="stream-video" />
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="stream-video"
+          />
         ) : (
           <div className="no-stream-overlay">
             <div className="start-prompt">
-              <div className="prompt-icon">🖥️</div>
-              <h2>WebRTC Data Center Monitor</h2>
-              <p>Start screen sharing to monitor your data center</p>
-              <button className="start-stream-button" onClick={startScreenShare}>
-                ▶ Start Screen Sharing
+              <div className="prompt-icon">🛰️</div>
+              <h2>Omniverse WebRTC Monitor</h2>
+              <p>Connect to the Omniverse WebRTC livestream server</p>
+              <button
+                className="start-stream-button"
+                onClick={connectOmniverseStream}
+              >
+                ▶ Connect Omniverse Stream
               </button>
             </div>
           </div>
@@ -254,7 +355,7 @@ function App() {
         </button>
       </div>
 
-      {/* LEFT PANEL (SLIDES ITSELF) */}
+      {/* LEFT PANEL */}
       <DraggableResizable
         initialX={14}
         initialY={14}
@@ -275,94 +376,90 @@ function App() {
         <GraphsPanel plottingVariables={plottingVariables} />
       </DraggableResizable>
 
-      {/* ✅ LEGEND (NEW) — shows only when left panel is open */}
+      {/* LEGEND */}
       {plotsExpanded && (
-          <div className={`legend-vertical-frame ${legendOpen ? "open" : ""}`}>
-            {/* Top row: gear only */}
-            <div className="legend-top-row">
-              <button
-                className="legend-gear"
-                onClick={() => setLegendOpen((v) => !v)}
-                title="Legend settings"
-                aria-label="Legend settings"
-              >
-                ⚙
-              </button>
-            </div>
-
-            {/* Body: values + vertical bar */}
-            <div className="legend-body">
-              <div className="legend-values">
-                <div className="legend-value-max">
-                  {legendVarObj.max}
-                  {legendVarObj.units}
-                </div>
-
-                <div className="legend-value-min">
-                  {legendVarObj.min}
-                  {legendVarObj.units}
-                </div>
-              </div>
-
-              <div className="legend-bar-vertical-wrap">
-                <div
-                  className="legend-bar-vertical"
-                  style={{ background: legendGradient }}
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-
-            {/* Settings (only when open) */}
-            {legendOpen && (
-              <div className="legend-settings-pop">
-                <div className="legend-settings-head">
-                  <div className="legend-settings-title">Legend Settings</div>
-                  <button
-                    className="legend-settings-close"
-                    onClick={() => setLegendOpen(false)}
-                    aria-label="Close legend settings"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="legend-settings-grid">
-                  <label className="legend-setting">
-                    <div className="legend-setting-label">Variable</div>
-                    <select
-                      className="legend-select"
-                      value={legendVar}
-                      onChange={(e) => setLegendVar(e.target.value)}
-                    >
-                      {LEGEND_VARIABLES.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="legend-setting">
-                    <div className="legend-setting-label">Palette</div>
-                    <select
-                      className="legend-select"
-                      value={legendPreset}
-                      onChange={(e) => setLegendPreset(e.target.value)}
-                    >
-                      {LEGEND_PRESETS.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </div>
-            )}
+        <div className={`legend-vertical-frame ${legendOpen ? "open" : ""}`}>
+          <div className="legend-top-row">
+            <button
+              className="legend-gear"
+              onClick={() => setLegendOpen((v) => !v)}
+              title="Legend settings"
+              aria-label="Legend settings"
+            >
+              ⚙
+            </button>
           </div>
-        )}
 
+          <div className="legend-body">
+            <div className="legend-values">
+              <div className="legend-value-max">
+                {legendVarObj.max}
+                {legendVarObj.units}
+              </div>
+
+              <div className="legend-value-min">
+                {legendVarObj.min}
+                {legendVarObj.units}
+              </div>
+            </div>
+
+            <div className="legend-bar-vertical-wrap">
+              <div
+                className="legend-bar-vertical"
+                style={{ background: legendGradient }}
+                aria-hidden="true"
+              />
+            </div>
+          </div>
+
+          {legendOpen && (
+            <div className="legend-settings-pop">
+              <div className="legend-settings-head">
+                <div className="legend-settings-title">Legend Settings</div>
+                <button
+                  className="legend-settings-close"
+                  onClick={() => setLegendOpen(false)}
+                  aria-label="Close legend settings"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="legend-settings-grid">
+                <label className="legend-setting">
+                  <div className="legend-setting-label">Variable</div>
+                  <select
+                    className="legend-select"
+                    value={legendVar}
+                    onChange={(e) => setLegendVar(e.target.value)}
+                  >
+                    {LEGEND_VARIABLES.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="legend-setting">
+                  <div className="legend-setting-label">Palette</div>
+                  <select
+                    className="legend-select"
+                    value={legendPreset}
+                    onChange={(e) => setLegendPreset(e.target.value)}
+                  >
+                    {LEGEND_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* RIGHT DOCK HANDLE */}
       <div className="dock-panel dock-right">
@@ -375,7 +472,7 @@ function App() {
         </button>
       </div>
 
-      {/* RIGHT PANEL (SLIDES ITSELF) */}
+      {/* RIGHT PANEL */}
       <DraggableResizable
         initialX={Math.max(20, window.innerWidth - 320)}
         initialY={14}
@@ -392,13 +489,11 @@ function App() {
         <div className="drag-handle panel-header-custom" title="Drag to move">
           <span className="panel-title">Dashboard Control</span>
 
-          {/* Neon STREAMING pill (click => stop) */}
+          {/* Streaming pill now controls Omniverse connection */}
           <button
             className={`streaming-pill ${isStreaming ? "on" : "off"}`}
-            onClick={isStreaming ? stopScreenShare : startScreenShare}
-            title={
-              isStreaming ? "Click to stop streaming" : "Click to start streaming"
-            }
+            onClick={isStreaming ? disconnectOmniverseStream : connectOmniverseStream}
+            title={isStreaming ? "Click to disconnect" : "Click to connect"}
           >
             {isStreaming ? "STREAMING" : "START"}
           </button>
@@ -410,9 +505,7 @@ function App() {
             {MODE_ORDER.map((mode) => (
               <button
                 key={mode}
-                className={`hud-mode-button ${
-                  activeMode === mode ? "active" : ""
-                }`}
+                className={`hud-mode-button ${activeMode === mode ? "active" : ""}`}
                 onClick={() => setActiveMode(mode)}
               >
                 {mode}
@@ -427,9 +520,7 @@ function App() {
             {tabs.map((tab) => (
               <button
                 key={tab}
-                className={`hud-tab-button ${
-                  activeTab === tab ? "active" : ""
-                }`}
+                className={`hud-tab-button ${activeTab === tab ? "active" : ""}`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}
