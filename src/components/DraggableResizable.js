@@ -52,7 +52,8 @@ export default function DraggableResizable({
 
   // Drag start (only when clicking an element with class drag-handle)
   const onMouseDown = (e) => {
-    if (!e.target.closest(".drag-handle")) return;
+    const target = e.target;
+    if (!target.closest(".drag-handle")) return;
 
     dragState.current.isDragging = true;
     dragState.current.startX = e.clientX;
@@ -150,7 +151,7 @@ export default function DraggableResizable({
         top: pos.y,
         width: size.width,
         height: size.height,
-        ...style,
+        ...style, // ✅ FIXED (was ".style," in your file)
       }}
       onMouseDown={onMouseDown}
     >
@@ -161,7 +162,6 @@ export default function DraggableResizable({
         </div>
       )}
 
-      {/* If hideDefaultHeader, user provides their own header inside children */}
       <div className="panel-content">{children}</div>
 
       {/* resize handles */}

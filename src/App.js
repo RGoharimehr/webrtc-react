@@ -12,6 +12,62 @@ import CFDAnalysis from "./tabs/CFDAnalysis";
 import GraphsPanel from "./components/GraphsPanel";
 import DraggableResizable from "./components/DraggableResizable";
 
+/* =========================
+   Legend config (NEW)
+   ========================= */
+const LEGEND_VARIABLES = [
+  { id: "temperature", label: "Temperature", units: "°C", min: 20, max: 90 },
+  { id: "pressure", label: "Pressure", units: "bar", min: 0.8, max: 2.8 },
+  { id: "power", label: "Power", units: "kW", min: 0, max: 200 },
+  { id: "velocity", label: "Velocity", units: "m/s", min: 0, max: 6 },
+  { id: "humidity", label: "Humidity", units: "%", min: 0, max: 100 },
+];
+
+const LEGEND_PRESETS = [
+  {
+    id: "viridis",
+    name: "Viridis",
+    gradient: "linear-gradient(180deg, #440154, #31688e, #35b779, #fde725)",
+  },
+  {
+    id: "inferno",
+    name: "Inferno",
+    gradient:
+      "linear-gradient(180deg, #000004, #420a68, #932567, #dd513a, #fca50a, #fcffa4)",
+  },
+  {
+    id: "magma",
+    name: "Magma",
+    gradient:
+      "linear-gradient(180deg, #000004, #3b0f70, #8c2981, #de4968, #fe9f6d, #fcfdbf)",
+  },
+
+  {
+    id: "plasma",
+    name: "Plasma",
+    gradient:
+     "linear-gradient(180deg, #0d0887, #7e03a8, #cc4678, #f89441, #f0f921)",
+  },
+  {
+    id: "turbo",
+    name: "Turbo",
+    gradient:
+     "linear-gradient(180deg, #30123b, #4456c7, #2ab9a1, #aadb32, #f9e721)",
+  },
+  {
+    id: "coolwarm",
+    name: "Cool–Warm",
+    gradient:
+     "linear-gradient(180deg, #3b4cc0, #788bff, #e6e6e6, #f2906b, #b40426)",
+  },
+  {
+   id: "gray",
+   name: "Grayscale",
+   gradient:
+     "linear-gradient(180deg, #000000, #ffffff)",
+  },
+];
+
 function App() {
   const MODE_ORDER = ["SIMULATE", "AI", "BUILD"];
 
@@ -56,6 +112,20 @@ function App() {
     power: true,
     humidity: false,
   });
+
+  /* =========================
+     Legend state (NEW)
+     ========================= */
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [legendVar, setLegendVar] = useState("temperature");
+  const [legendPreset, setLegendPreset] = useState("viridis");
+
+  const legendVarObj =
+    LEGEND_VARIABLES.find((v) => v.id === legendVar) || LEGEND_VARIABLES[0];
+
+  const legendGradient =
+    (LEGEND_PRESETS.find((p) => p.id === legendPreset) || LEGEND_PRESETS[0])
+      .gradient;
 
   // Persist mode & tab per mode
   useEffect(() => {
@@ -205,6 +275,95 @@ function App() {
         <GraphsPanel plottingVariables={plottingVariables} />
       </DraggableResizable>
 
+      {/* ✅ LEGEND (NEW) — shows only when left panel is open */}
+      {plotsExpanded && (
+          <div className={`legend-vertical-frame ${legendOpen ? "open" : ""}`}>
+            {/* Top row: gear only */}
+            <div className="legend-top-row">
+              <button
+                className="legend-gear"
+                onClick={() => setLegendOpen((v) => !v)}
+                title="Legend settings"
+                aria-label="Legend settings"
+              >
+                ⚙
+              </button>
+            </div>
+
+            {/* Body: values + vertical bar */}
+            <div className="legend-body">
+              <div className="legend-values">
+                <div className="legend-value-max">
+                  {legendVarObj.max}
+                  {legendVarObj.units}
+                </div>
+
+                <div className="legend-value-min">
+                  {legendVarObj.min}
+                  {legendVarObj.units}
+                </div>
+              </div>
+
+              <div className="legend-bar-vertical-wrap">
+                <div
+                  className="legend-bar-vertical"
+                  style={{ background: legendGradient }}
+                  aria-hidden="true"
+                />
+              </div>
+            </div>
+
+            {/* Settings (only when open) */}
+            {legendOpen && (
+              <div className="legend-settings-pop">
+                <div className="legend-settings-head">
+                  <div className="legend-settings-title">Legend Settings</div>
+                  <button
+                    className="legend-settings-close"
+                    onClick={() => setLegendOpen(false)}
+                    aria-label="Close legend settings"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="legend-settings-grid">
+                  <label className="legend-setting">
+                    <div className="legend-setting-label">Variable</div>
+                    <select
+                      className="legend-select"
+                      value={legendVar}
+                      onChange={(e) => setLegendVar(e.target.value)}
+                    >
+                      {LEGEND_VARIABLES.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="legend-setting">
+                    <div className="legend-setting-label">Palette</div>
+                    <select
+                      className="legend-select"
+                      value={legendPreset}
+                      onChange={(e) => setLegendPreset(e.target.value)}
+                    >
+                      {LEGEND_PRESETS.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+
       {/* RIGHT DOCK HANDLE */}
       <div className="dock-panel dock-right">
         <button
@@ -237,7 +396,9 @@ function App() {
           <button
             className={`streaming-pill ${isStreaming ? "on" : "off"}`}
             onClick={isStreaming ? stopScreenShare : startScreenShare}
-            title={isStreaming ? "Click to stop streaming" : "Click to start streaming"}
+            title={
+              isStreaming ? "Click to stop streaming" : "Click to start streaming"
+            }
           >
             {isStreaming ? "STREAMING" : "START"}
           </button>
@@ -249,7 +410,9 @@ function App() {
             {MODE_ORDER.map((mode) => (
               <button
                 key={mode}
-                className={`hud-mode-button ${activeMode === mode ? "active" : ""}`}
+                className={`hud-mode-button ${
+                  activeMode === mode ? "active" : ""
+                }`}
                 onClick={() => setActiveMode(mode)}
               >
                 {mode}
@@ -264,7 +427,9 @@ function App() {
             {tabs.map((tab) => (
               <button
                 key={tab}
-                className={`hud-tab-button ${activeTab === tab ? "active" : ""}`}
+                className={`hud-tab-button ${
+                  activeTab === tab ? "active" : ""
+                }`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}

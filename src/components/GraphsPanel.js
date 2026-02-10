@@ -1,186 +1,96 @@
-import React from 'react';
+import React from "react";
 
 const GraphsPanel = ({ plottingVariables }) => {
-  const graphs = {
-    temperature: { enabled: plottingVariables.temperature, value: 68.5, unit: '°C', trend: '+2.3' },
-    power: { enabled: plottingVariables.power, value: 125.8, unit: 'kW', trend: '-1.2' },
-    pressure: { enabled: plottingVariables.pressure, value: 101.3, unit: 'kPa', trend: '+0.5' },
-    velocity: { enabled: plottingVariables.velocity, value: 2.4, unit: 'm/s', trend: '+0.1' },
-    humidity: { enabled: plottingVariables.humidity, value: 52, unit: '%', trend: '+1.0' }
+  const chartData = {
+    temperature: { current: "68.5°C", trend: "+2.3°C" },
+    power: { current: "125.8kW", trend: "-1.2kW" },
+    pressure: { current: "2.1bar", trend: "+0.1bar" },
+    velocity: { current: "3.2m/s", trend: "+0.4m/s" },
+    humidity: { current: "45%", trend: "+5%" },
+  };
+
+  const sparklineData = {
+    temperature: [50, 52, 55, 54, 58, 62, 64, 66, 65, 68, 70, 69, 71, 72],
+    power: [120, 122, 121, 124, 125, 126, 125, 127, 128, 127, 129, 130, 129, 131],
+    pressure: [2.0, 2.05, 2.02, 2.1, 2.12, 2.08, 2.15, 2.18, 2.16, 2.2, 2.22, 2.19],
+    velocity: [2.8, 3.0, 3.1, 3.05, 3.2, 3.3, 3.25, 3.4, 3.5, 3.45],
+    humidity: [40, 42, 43, 41, 45, 44, 46, 47, 45],
+  };
+
+  const createSparkline = (data, color) => {
+    const width = 180;
+    const height = 46;
+    const padding = 4;
+
+    const max = Math.max(...data); // ✅ FIXED
+    const min = Math.min(...data); // ✅ FIXED
+
+    const points = data
+      .map((value, index) => {
+        const x = (index / (data.length - 1)) * (width - padding * 2) + padding;
+        const y = height - ((value - min) / (max - min || 1)) * (height - padding * 2) - padding;
+        return `${x},${y}`;
+      })
+      .join(" ");
+
+    return (
+      <svg
+        className="graph-sparkline"
+        width="100%"
+        height="46"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+      >
+        <polyline
+          points={points}
+          fill="none"
+          stroke={color}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    );
   };
 
   return (
-    <div className="graphs-panel-inner">
-      <div className="graphs-panel-content">
-        {/* Temperature Graph */}
-        {graphs.temperature.enabled && (
-          <div className="graph-card">
-            <div className="graph-card-title">Temperature Distribution</div>
-            <div className="graph-visualization">
-              <svg style={{ width: '100%', height: '80px' }}>
-                <defs>
-                  <linearGradient id="tempGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#ff6b6b', stopOpacity: 0.4 }} />
-                    <stop offset="100%" style={{ stopColor: '#ff6b6b', stopOpacity: 0.05 }} />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M 0 60 L 15 50 L 30 55 L 45 45 L 60 48 L 75 40 L 90 38 L 105 35 L 120 38 L 135 30 L 150 33 L 165 28 L 180 30 L 195 25 L 210 28"
-                  fill="url(#tempGradient)"
-                  stroke="#ff6b6b"
-                  strokeWidth="2"
-                />
-              </svg>
+    <div className="graphs-panel-content">
+      {Object.keys(plottingVariables).map((key) => {
+        if (!plottingVariables[key]) return null;
+
+        const color = key === "temperature" ? "#ff6b6b" : "#86ef47";
+        const data = chartData[key];
+        const sparkData = sparklineData[key] || [1, 2, 3, 2, 4];
+
+        return (
+          <div key={key} className="graph-card">
+            <div className="graph-card-title">
+              {key.charAt(0).toUpperCase() + key.slice(1)} Trend
             </div>
-            <div className="graph-metrics">
-              <div className="graph-metric">
-                <div className="graph-metric-label">Current</div>
-                <div className="graph-metric-value">{graphs.temperature.value}{graphs.temperature.unit}</div>
+
+            <div className="graph-visualization">{createSparkline(sparkData, color)}</div>
+
+            <div className="graph-metrics graph-metrics-chips">
+              <div className="metric-chip">
+                <div className="metric-chip-label">Current</div>
+                <div className="metric-chip-value">{data?.current || "N/A"}</div>
               </div>
-              <div className="graph-metric">
-                <div className="graph-metric-label">Trend</div>
-                <div className="graph-metric-value" style={{ color: graphs.temperature.trend.startsWith('+') ? '#ff6b6b' : '#86ef47' }}>
-                  {graphs.temperature.trend}{graphs.temperature.unit}
+
+              <div className="metric-chip">
+                <div className="metric-chip-label">Trend</div>
+                <div
+                  className={`metric-chip-value ${
+                    String(data?.trend || "").startsWith("-") ? "neg" : "pos"
+                  }`}
+                >
+                  {data?.trend || "N/A"}
                 </div>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Power Graph */}
-        {graphs.power.enabled && (
-          <div className="graph-card">
-            <div className="graph-card-title">Power Consumption</div>
-            <div className="graph-visualization">
-              <svg style={{ width: '100%', height: '80px' }}>
-                <defs>
-                  <linearGradient id="powerGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#86ef47', stopOpacity: 0.4 }} />
-                    <stop offset="100%" style={{ stopColor: '#86ef47', stopOpacity: 0.05 }} />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M 0 45 L 15 42 L 30 44 L 45 38 L 60 40 L 75 36 L 90 34 L 105 38 L 120 32 L 135 34 L 150 30 L 165 32 L 180 28 L 195 30 L 210 26"
-                  fill="url(#powerGradient)"
-                  stroke="#86ef47"
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-            <div className="graph-metrics">
-              <div className="graph-metric">
-                <div className="graph-metric-label">Current</div>
-                <div className="graph-metric-value">{graphs.power.value}{graphs.power.unit}</div>
-              </div>
-              <div className="graph-metric">
-                <div className="graph-metric-label">Trend</div>
-                <div className="graph-metric-value" style={{ color: graphs.power.trend.startsWith('-') ? '#86ef47' : '#ff6b6b' }}>
-                  {graphs.power.trend}{graphs.power.unit}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Pressure Graph */}
-        {graphs.pressure.enabled && (
-          <div className="graph-card">
-            <div className="graph-card-title">Pressure Field</div>
-            <div className="graph-visualization">
-              <svg style={{ width: '100%', height: '80px' }}>
-                <defs>
-                  <linearGradient id="pressureGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#0050E0', stopOpacity: 0.4 }} />
-                    <stop offset="100%" style={{ stopColor: '#0050E0', stopOpacity: 0.05 }} />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M 0 52 L 15 50 L 30 54 L 45 48 L 60 50 L 75 46 L 90 48 L 105 44 L 120 46 L 135 42 L 150 44 L 165 40 L 180 42 L 195 38 L 210 40"
-                  fill="url(#pressureGradient)"
-                  stroke="#0050E0"
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-            <div className="graph-metrics">
-              <div className="graph-metric">
-                <div className="graph-metric-label">Current</div>
-                <div className="graph-metric-value">{graphs.pressure.value}{graphs.pressure.unit}</div>
-              </div>
-              <div className="graph-metric">
-                <div className="graph-metric-label">Trend</div>
-                <div className="graph-metric-value">{graphs.pressure.trend}{graphs.pressure.unit}</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Velocity Graph */}
-        {graphs.velocity.enabled && (
-          <div className="graph-card">
-            <div className="graph-card-title">Velocity Field</div>
-            <div className="graph-visualization">
-              <svg style={{ width: '100%', height: '80px' }}>
-                <defs>
-                  <linearGradient id="velocityGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#00ffff', stopOpacity: 0.4 }} />
-                    <stop offset="100%" style={{ stopColor: '#00ffff', stopOpacity: 0.05 }} />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M 0 48 L 15 46 L 30 50 L 45 44 L 60 46 L 75 42 L 90 44 L 105 40 L 120 42 L 135 38 L 150 40 L 165 36 L 180 38 L 195 34 L 210 36"
-                  fill="url(#velocityGradient)"
-                  stroke="#00ffff"
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-            <div className="graph-metrics">
-              <div className="graph-metric">
-                <div className="graph-metric-label">Current</div>
-                <div className="graph-metric-value">{graphs.velocity.value}{graphs.velocity.unit}</div>
-              </div>
-              <div className="graph-metric">
-                <div className="graph-metric-label">Trend</div>
-                <div className="graph-metric-value">{graphs.velocity.trend}{graphs.velocity.unit}</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Humidity Graph */}
-        {graphs.humidity.enabled && (
-          <div className="graph-card">
-            <div className="graph-card-title">Humidity</div>
-            <div className="graph-visualization">
-              <svg style={{ width: '100%', height: '80px' }}>
-                <defs>
-                  <linearGradient id="humidityGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#4a9eff', stopOpacity: 0.4 }} />
-                    <stop offset="100%" style={{ stopColor: '#4a9eff', stopOpacity: 0.05 }} />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M 0 50 L 15 48 L 30 52 L 45 46 L 60 48 L 75 44 L 90 46 L 105 42 L 120 44 L 135 40 L 150 42 L 165 38 L 180 40 L 195 36 L 210 38"
-                  fill="url(#humidityGradient)"
-                  stroke="#4a9eff"
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-            <div className="graph-metrics">
-              <div className="graph-metric">
-                <div className="graph-metric-label">Current</div>
-                <div className="graph-metric-value">{graphs.humidity.value}{graphs.humidity.unit}</div>
-              </div>
-              <div className="graph-metric">
-                <div className="graph-metric-label">Trend</div>
-                <div className="graph-metric-value">{graphs.humidity.trend}{graphs.humidity.unit}</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+        );
+      })}
     </div>
   );
 };
