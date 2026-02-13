@@ -24,9 +24,9 @@ const ResultsVisualization = () => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => {
       const lines = prev.split('\n');
-      // Cap at 200 lines to prevent unbounded growth
-      if (lines.length > 200) {
-        lines.splice(0, lines.length - 200);
+      // Keep only the last 199 lines, then add the new one (total: 200)
+      if (lines.length >= 200) {
+        lines.splice(0, lines.length - 199);
       }
       return lines.join('\n') + `\n[${timestamp}] Applied visualization: ${vizSettings.property} with ${vizSettings.colormap} colormap`;
     });
