@@ -99,6 +99,9 @@ function App() {
   // Ref to track current stream for cleanup
   const screenStreamRef = useRef(null);
 
+  // GraphsPanel API ref for data recording
+  const graphsApiRef = useRef(null);
+
   // Docks
   const [hudExpanded, setHudExpanded] = useState(true);
   const [plotsExpanded, setPlotsExpanded] = useState(true);
@@ -366,6 +369,7 @@ function App() {
           <Plotting
             plottingVariables={plottingVariables}
             setPlottingVariables={setPlottingVariables}
+            graphsApiRef={graphsApiRef}
           />
         );
       case "CFD Analysis":
@@ -453,7 +457,10 @@ function App() {
           <span className="panel-title">Live Metrics</span>
         </div>
 
-        <GraphsPanel plottingVariables={plottingVariables} />
+        <GraphsPanel 
+          plottingVariables={plottingVariables}
+          ref={graphsApiRef}
+        />
       </DraggableResizable>
 
       {/* LEGEND */}

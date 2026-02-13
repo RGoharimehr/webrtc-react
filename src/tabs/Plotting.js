@@ -1,27 +1,157 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 
-const Plotting = ({ plottingVariables, setPlottingVariables }) => {
+const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => {
   const [xAxis, setXAxis] = useState('time');
-  const [hasData, setHasData] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [sampleCount, setSampleCount] = useState(0);
+  const recordedDataRef = useRef([]);
+  const recordingIntervalRef = useRef(null);
 
   const toggleVariable = (variable) => {
     setPlottingVariables(prev => ({ ...prev, [variable]: !prev[variable] }));
   };
 
-  const addPlot = () => {
-    setHasData(true);
+  const startRecording = () => {
+    if (!graphsApiRef?.current) {
+      alert('Data source not available. Please wait for the application to fully load.');
+      return;
+    }
+
+    // Check if at least one variable is selected
+    const hasSelectedVariable = Object.values(plottingVariables).some(v => v);
+    if (!hasSelectedVariable) {
+      alert('Please select at least one Y-axis variable to record.');
+      return;
+    }
+
+    recordedDataRef.current = [];
+    setSampleCount(0);
+    setIsRecording(true);
+
+    // Start recording samples every 500ms
+    recordingIntervalRef.current = setInterval(() => {
+      if (graphsApiRef.current) {
+        const data = graphsApiRef.current.getCurrentData();
+        recordedDataRef.current.push(data);
+        setSampleCount(prev => prev + 1);
+      }
+    }, 500);
   };
 
-  const clearPlots = () => {
-    setHasData(false);
-    setPlottingVariables({
-      temperature: false,
-      pressure: false,
-      velocity: false,
-      power: false,
-      humidity: false
-    });
+  const stopRecording = async () => {
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+
+    setIsRecording(false);
+
+    if (recordedDataRef.current.length === 0) {
+      alert('No data recorded. Please start recording first.');
+      return;
+    }
+
+    // Export to XLSX
+    await exportToXLSX(recordedDataRef.current);
   };
+
+  const exportToXLSX = async (data) => {
+    // Prepare data for Excel
+    const rows = data.map(sample => {
+      const row = {};
+      
+      // Add X-axis data
+      switch (xAxis) {
+        case 'time':
+          row['Time [s]'] = sample.time.toFixed(2);
+          break;
+        case 'iteration':
+          row['Iteration'] = sample.iteration;
+          break;
+        case 'distance':
+          row['Distance [m]'] = sample.distance.toFixed(2);
+          break;
+        default:
+          row['Time [s]'] = sample.time.toFixed(2);
+      }
+
+      // Add Y-axis data for selected variables
+      if (plottingVariables.temperature) {
+        row['Temperature [°C]'] = sample.temperature.toFixed(2);
+      }
+      if (plottingVariables.pressure) {
+        row['Pressure [bar]'] = sample.pressure.toFixed(3);
+      }
+      if (plottingVariables.velocity) {
+        row['Velocity [m/s]'] = sample.velocity.toFixed(2);
+      }
+      if (plottingVariables.power) {
+        row['Power [kW]'] = sample.power.toFixed(2);
+      }
+      if (plottingVariables.humidity) {
+        row['Humidity [%]'] = sample.humidity.toFixed(1);
+      }
+
+      return row;
+    });
+
+    // Create workbook and worksheet
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Recording');
+
+    // Generate filename with timestamp
+    const now = new Date();
+    const timestamp = now.toISOString()
+      .replace(/:/g, '-')
+      .replace(/\..+/, '')
+      .replace('T', '_');
+    const filename = `omnicool_recording_${timestamp}.xlsx`;
+
+    // Try File System Access API first (modern browsers)
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{
+            description: 'Excel Workbook',
+            accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
+          }]
+        });
+
+        const writable = await handle.createWritable();
+        const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+        await writable.write(buffer);
+        await writable.close();
+
+        alert(`Recording saved successfully! ${recordedDataRef.current.length} samples exported.`);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Error saving file:', err);
+          // Fallback to browser download
+          fallbackDownload(workbook, filename);
+        }
+      }
+    } else {
+      // Fallback for older browsers
+      fallbackDownload(workbook, filename);
+    }
+  };
+
+  const fallbackDownload = (workbook, filename) => {
+    XLSX.writeFile(workbook, filename);
+    alert(`Recording downloaded! ${recordedDataRef.current.length} samples exported.`);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div>
@@ -37,6 +167,7 @@ const Plotting = ({ plottingVariables, setPlottingVariables }) => {
                 type="checkbox"
                 checked={plottingVariables.temperature}
                 onChange={() => toggleVariable('temperature')}
+                disabled={isRecording}
               />
               <span>Temperature [°C]</span>
             </label>
@@ -45,14 +176,16 @@ const Plotting = ({ plottingVariables, setPlottingVariables }) => {
                 type="checkbox"
                 checked={plottingVariables.pressure}
                 onChange={() => toggleVariable('pressure')}
+                disabled={isRecording}
               />
-              <span>Pressure [Pa]</span>
+              <span>Pressure [bar]</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="checkbox"
                 checked={plottingVariables.velocity}
                 onChange={() => toggleVariable('velocity')}
+                disabled={isRecording}
               />
               <span>Velocity [m/s]</span>
             </label>
@@ -61,6 +194,7 @@ const Plotting = ({ plottingVariables, setPlottingVariables }) => {
                 type="checkbox"
                 checked={plottingVariables.power}
                 onChange={() => toggleVariable('power')}
+                disabled={isRecording}
               />
               <span>Power Consumption [kW]</span>
             </label>
@@ -69,6 +203,7 @@ const Plotting = ({ plottingVariables, setPlottingVariables }) => {
                 type="checkbox"
                 checked={plottingVariables.humidity}
                 onChange={() => toggleVariable('humidity')}
+                disabled={isRecording}
               />
               <span>Humidity [%]</span>
             </label>
@@ -84,6 +219,7 @@ const Plotting = ({ plottingVariables, setPlottingVariables }) => {
             value={xAxis}
             onChange={(e) => setXAxis(e.target.value)}
             style={{ flex: 1 }}
+            disabled={isRecording}
           >
             <option value="time">Time [s]</option>
             <option value="iteration">Iteration Number</option>
@@ -93,109 +229,68 @@ const Plotting = ({ plottingVariables, setPlottingVariables }) => {
       </div>
 
       <div className="section">
-        <h2 className="section-title">Plot Actions</h2>
+        <h2 className="section-title">Data Recorder</h2>
+        
+        {isRecording && (
+          <div style={{
+            background: 'rgba(134, 239, 71, 0.1)',
+            border: '1px solid rgba(134, 239, 71, 0.3)',
+            borderRadius: '12px',
+            padding: '12px',
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{ color: 'var(--success-green)', fontSize: '20px' }}>●</span>
+            <span style={{ color: 'var(--success-green)', fontWeight: 600 }}>
+              Recording in progress...
+            </span>
+            <span style={{ 
+              marginLeft: 'auto',
+              color: 'var(--text-primary)',
+              fontSize: '14px',
+              fontWeight: 600
+            }}>
+              {sampleCount} samples
+            </span>
+          </div>
+        )}
+
         <div className="button-group">
-          <button className="success" onClick={addPlot}>
-            Add Plot
-          </button>
-          <button className="warning" onClick={clearPlots}>
-            Clear All Plots
-          </button>
+          {!isRecording ? (
+            <button 
+              className="success" 
+              onClick={startRecording}
+            >
+              ▶ Start Recording
+            </button>
+          ) : (
+            <button 
+              className="warning" 
+              onClick={stopRecording}
+            >
+              ■ Stop Recording & Export
+            </button>
+          )}
         </div>
+
+        {!isRecording && sampleCount > 0 && (
+          <div style={{
+            marginTop: '12px',
+            color: 'var(--text-secondary)',
+            fontSize: '13px'
+          }}>
+            Last recording: {sampleCount} samples captured
+          </div>
+        )}
       </div>
 
-      {!hasData && (
+      {!isRecording && (
         <div className="warning-message">
-          ⚠️ No simulation data recorded. Run a simulation to generate plot data.
-        </div>
-      )}
-
-      {hasData && (
-        <div className="section">
-          <h2 className="section-title">Plot Window</h2>
-          <div style={{
-            background: '#E6E6E6',
-            borderRadius: '8px',
-            padding: '20px',
-            minHeight: '400px'
-          }}>
-            <div style={{
-              background: 'white',
-              borderRadius: '4px',
-              padding: '16px',
-              marginBottom: '16px',
-              border: '1px solid #ccc'
-            }}>
-              <div style={{ color: '#333', fontWeight: 600, marginBottom: '8px' }}>
-                Temperature vs Time
-              </div>
-              <div style={{
-                height: '200px',
-                background: 'linear-gradient(to right, rgba(0,122,255,0.1), rgba(0,122,255,0.3))',
-                borderRadius: '4px',
-                position: 'relative',
-                border: '1px solid #ddd'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: '50px',
-                  background: 'rgba(0,0,0,0.05)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#666',
-                  fontSize: '12px'
-                }}>
-                  °C
-                </div>
-                <svg style={{ width: '100%', height: '100%' }}>
-                  <line x1="50" y1="20" x2="90%" y2="180" stroke="#0050E0" strokeWidth="2" />
-                </svg>
-              </div>
-            </div>
-
-            {plottingVariables.power && (
-              <div style={{
-                background: 'white',
-                borderRadius: '4px',
-                padding: '16px',
-                border: '1px solid #ccc'
-              }}>
-                <div style={{ color: '#333', fontWeight: 600, marginBottom: '8px' }}>
-                  Power Consumption vs Time
-                </div>
-                <div style={{
-                  height: '200px',
-                  background: 'linear-gradient(to right, rgba(134,239,71,0.1), rgba(134,239,71,0.3))',
-                  borderRadius: '4px',
-                  position: 'relative',
-                  border: '1px solid #ddd'
-                }}>
-                  <div style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: '50px',
-                    background: 'rgba(0,0,0,0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#666',
-                    fontSize: '12px'
-                  }}>
-                    kW
-                  </div>
-                  <svg style={{ width: '100%', height: '100%' }}>
-                    <line x1="50" y1="100" x2="90%" y2="80" stroke="#86ef47" strokeWidth="2" />
-                  </svg>
-                </div>
-              </div>
-            )}
-          </div>
+          ℹ️ Select variables and click "Start Recording" to begin capturing live data. 
+          The recording will include all selected Y-axis variables sampled at 2 Hz (500ms intervals).
+          When you stop, an Excel file will be exported with the format: omnicool_recording_YYYY-MM-DD_HH-mm-ss.xlsx
         </div>
       )}
     </div>
