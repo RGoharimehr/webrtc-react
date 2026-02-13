@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 const ResultsMapping = () => {
   const [targetPath, setTargetPath] = useState('/World');
   const [logs, setLogs] = useState('Results mapping ready.\n');
+  const timerRef = useRef(null);
 
   const addLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => `${prev}[${timestamp}] ${message}\n`);
+    setLogs(prev => {
+      const lines = prev.split('\n');
+      // Cap at 200 lines to prevent unbounded growth
+      if (lines.length > 200) {
+        lines.splice(0, lines.length - 200);
+      }
+      return lines.join('\n') + `[${timestamp}] ${message}\n`;
+    });
   };
 
   const startPropertyOverride = () => {
@@ -15,7 +23,7 @@ const ResultsMapping = () => {
 
   const generateMappingConfig = () => {
     addLog('Generating mapping configuration file...');
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       addLog('Mapping config file generated successfully');
     }, 500);
   };
@@ -27,6 +35,15 @@ const ResultsMapping = () => {
   const exportProject = () => {
     addLog('Opening export dialog...');
   };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div>

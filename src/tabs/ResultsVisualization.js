@@ -22,7 +22,14 @@ const ResultsVisualization = () => {
 
   const applyVisualization = () => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => `${prev}\n[${timestamp}] Applied visualization: ${vizSettings.property} with ${vizSettings.colormap} colormap`);
+    setLogs(prev => {
+      const lines = prev.split('\n');
+      // Cap at 200 lines to prevent unbounded growth
+      if (lines.length > 200) {
+        lines.splice(0, lines.length - 200);
+      }
+      return lines.join('\n') + `\n[${timestamp}] Applied visualization: ${vizSettings.property} with ${vizSettings.colormap} colormap`;
+    });
   };
 
   return (

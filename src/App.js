@@ -13,6 +13,23 @@ import GraphsPanel from "./components/GraphsPanel";
 import DraggableResizable from "./components/DraggableResizable";
 
 /* =========================
+   Mode and Tab Configuration
+   ========================= */
+const MODE_ORDER = ["SIMULATE", "AI", "BUILD"];
+
+const MODE_TABS = {
+  SIMULATE: [
+    "Operating Conditions",
+    "Geometrical Design",
+    "Results Visualization",
+    "Plotting",
+    "CFD Analysis",
+  ],
+  AI: ["AI"],
+  BUILD: ["Configuration", "Results Mapping"],
+};
+
+/* =========================
    Legend config
    ========================= */
 const LEGEND_VARIABLES = [
@@ -67,20 +84,6 @@ const LEGEND_PRESETS = [
 ];
 
 function App() {
-  const MODE_ORDER = ["SIMULATE", "AI", "BUILD"];
-
-  const MODE_TABS = {
-    SIMULATE: [
-      "Operating Conditions",
-      "Geometrical Design",
-      "Results Visualization",
-      "Plotting",
-      "CFD Analysis",
-    ],
-    AI: ["AI"],
-    BUILD: ["Configuration", "Results Mapping"],
-  };
-
   // WebRTC refs
   const pcRef = useRef(null);
   const wsRef = useRef(null);
@@ -92,6 +95,9 @@ function App() {
 
   // Streaming mode: "omniverse" | "screen" | null
   const [streamMode, setStreamMode] = useState(null);
+  
+  // Ref to track current stream for cleanup
+  const screenStreamRef = useRef(null);
 
   // Docks
   const [hudExpanded, setHudExpanded] = useState(true);
@@ -158,18 +164,28 @@ function App() {
     }
   }, [screenStream]);
 
+  // Keep ref in sync with screenStream for cleanup
+  useEffect(() => {
+    screenStreamRef.current = screenStream;
+  }, [screenStream]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       try {
         if (pcRef.current) pcRef.current.close();
         if (wsRef.current) wsRef.current.close();
-      } catch {}
+      } catch (e) {
+        console.warn("Cleanup error (WebRTC):", e);
+      }
       try {
-        if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
-      } catch {}
+        if (screenStreamRef.current) {
+          screenStreamRef.current.getTracks().forEach((t) => t.stop());
+        }
+      } catch (e) {
+        console.warn("Cleanup error (stream):", e);
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stopScreenShare = () => {
@@ -177,7 +193,9 @@ function App() {
       if (screenStream) {
         screenStream.getTracks().forEach((t) => t.stop());
       }
-    } catch {}
+    } catch (e) {
+      console.warn("Error stopping screen share:", e);
+    }
     setScreenStream(null);
     setIsStreaming(false);
     setStreamMode(null);
@@ -187,7 +205,9 @@ function App() {
     try {
       if (pcRef.current) pcRef.current.close();
       if (wsRef.current) wsRef.current.close();
-    } catch {}
+    } catch (e) {
+      console.warn("Error disconnecting Omniverse stream:", e);
+    }
 
     pcRef.current = null;
     wsRef.current = null;
@@ -222,8 +242,8 @@ function App() {
     // Stop any active screen-share first
     stopScreenShare();
 
-    // Use env if set; otherwise your IP/port defaults
-    const host = process.env.REACT_APP_OV_SIGNAL_HOST || "153.104.44.62";
+    // Use env if set; otherwise use localhost defaults
+    const host = process.env.REACT_APP_OV_SIGNAL_HOST || "localhost";
     const port = process.env.REACT_APP_OV_SIGNAL_PORT || "49100";
     const proto = process.env.REACT_APP_OV_SIGNAL_PROTO || "ws";
 
@@ -409,6 +429,7 @@ function App() {
           className="dock-handle"
           onClick={() => setPlotsExpanded((v) => !v)}
           title={plotsExpanded ? "Hide panel" : "Show panel"}
+          aria-label={plotsExpanded ? "Hide metrics panel" : "Show metrics panel"}
         >
           {plotsExpanded ? "‹" : "›"}
         </button>
@@ -526,6 +547,7 @@ function App() {
           className="dock-handle"
           onClick={() => setHudExpanded((v) => !v)}
           title={hudExpanded ? "Hide panel" : "Show panel"}
+          aria-label={hudExpanded ? "Hide dashboard panel" : "Show dashboard panel"}
         >
           {hudExpanded ? "›" : "‹"}
         </button>

@@ -21,6 +21,10 @@ export default function DraggableResizable({
   const [pos, setPos] = useState({ x: initialX, y: initialY });
   const [size, setSize] = useState({ width: initialWidth, height: initialHeight });
 
+  // Store pos and size in refs for the mousemove handler
+  const posRef = useRef(pos);
+  const sizeRef = useRef(size);
+
   const dragState = useRef({
     isDragging: false,
     startX: 0,
@@ -40,15 +44,14 @@ export default function DraggableResizable({
     startTop: 0,
   });
 
-  // keep in bounds (viewport)
-  const clampToViewport = (x, y, w, h) => {
-    const maxX = Math.max(0, window.innerWidth - w);
-    const maxY = Math.max(0, window.innerHeight - h);
-    return {
-      x: Math.min(Math.max(0, x), maxX),
-      y: Math.min(Math.max(0, y), maxY),
-    };
-  };
+  // Keep refs in sync with state
+  useEffect(() => {
+    posRef.current = pos;
+  }, [pos]);
+
+  useEffect(() => {
+    sizeRef.current = size;
+  }, [size]);
 
   // Drag start (only when clicking an element with class drag-handle)
   const onMouseDown = (e) => {
@@ -80,8 +83,17 @@ export default function DraggableResizable({
   };
 
   useEffect(() => {
+    const clamp = (x, y, w, h) => {
+      const maxX = Math.max(0, window.innerWidth - w);
+      const maxY = Math.max(0, window.innerHeight - h);
+      return {
+        x: Math.min(Math.max(0, x), maxX),
+        y: Math.min(Math.max(0, y), maxY),
+      };
+    };
+
     const onMove = (e) => {
-      // Dragging
+      // Dragging - use refs for current values
       if (dragState.current.isDragging) {
         const dx = e.clientX - dragState.current.startX;
         const dy = e.clientY - dragState.current.startY;
@@ -89,11 +101,11 @@ export default function DraggableResizable({
         const nextX = dragState.current.startLeft + dx;
         const nextY = dragState.current.startTop + dy;
 
-        const clamped = clampToViewport(nextX, nextY, size.width, size.height);
+        const clamped = clamp(nextX, nextY, sizeRef.current.width, sizeRef.current.height);
         setPos(clamped);
       }
 
-      // Resizing
+      // Resizing - use refs for current values
       if (resizeState.current.isResizing) {
         const dx = e.clientX - resizeState.current.startX;
         const dy = e.clientY - resizeState.current.startY;
@@ -121,7 +133,7 @@ export default function DraggableResizable({
         newW = Math.min(Math.max(minWidth, newW), maxWidth);
         newH = Math.min(Math.max(minHeight, newH), maxHeight);
 
-        const clamped = clampToViewport(newX, newY, newW, newH);
+        const clamped = clamp(newX, newY, newW, newH);
         setPos(clamped);
         setSize({ width: newW, height: newH });
       }
@@ -140,7 +152,7 @@ export default function DraggableResizable({
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [pos.x, pos.y, size.width, size.height, minWidth, minHeight, maxWidth, maxHeight]);
+  }, [minWidth, minHeight, maxWidth, maxHeight]);
 
   return (
     <div
