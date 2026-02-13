@@ -101,12 +101,12 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Recording');
 
-    // Generate filename with timestamp
+    // Generate filename with timestamp (format: YYYY-MM-DD_HH-mm-ss)
     const now = new Date();
     const timestamp = now.toISOString()
-      .replace(/:/g, '-')
-      .replace(/\..+/, '')
-      .replace('T', '_');
+      .replace(/:/g, '-')      // Replace colons with hyphens
+      .replace(/\..+/, '')     // Remove milliseconds
+      .replace('T', '_');      // Replace T with underscore
     const filename = `omnicool_recording_${timestamp}.xlsx`;
 
     // Try File System Access API first (modern browsers)

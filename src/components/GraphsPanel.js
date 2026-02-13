@@ -37,7 +37,7 @@ const GraphsPanel = React.memo(
         timestamp: new Date(),
         time: timeRef.current,
         iteration: iterationRef.current,
-        distance: timeRef.current * 0.5, // Mock distance calculation
+        distance: timeRef.current * 0.5, // Mock distance: assumes constant velocity of 0.5 m/s
         ...liveData,
       }),
     }));
@@ -157,7 +157,7 @@ const GraphsPanel = React.memo(
                 <div className="metric-current">
                   <div className="metric-current-label">Current</div>
                   <div className="metric-current-value">
-                    {g.value.toFixed(2)}
+                    {key === 'humidity' ? g.value.toFixed(1) : g.value.toFixed(2)}
                     <span className="metric-unit">{g.unit}</span>
                   </div>
                 </div>
