@@ -90,6 +90,9 @@ function App() {
   const [screenStream, setScreenStream] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
 
+  // Streaming mode: "omniverse" | "screen" | null
+  const [streamMode, setStreamMode] = useState(null);
+
   // Docks
   const [hudExpanded, setHudExpanded] = useState(true);
   const [plotsExpanded, setPlotsExpanded] = useState(true);
@@ -162,8 +165,23 @@ function App() {
         if (pcRef.current) pcRef.current.close();
         if (wsRef.current) wsRef.current.close();
       } catch {}
+      try {
+        if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
+      } catch {}
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const stopScreenShare = () => {
+    try {
+      if (screenStream) {
+        screenStream.getTracks().forEach((t) => t.stop());
+      }
+    } catch {}
+    setScreenStream(null);
+    setIsStreaming(false);
+    setStreamMode(null);
+  };
 
   const disconnectOmniverseStream = () => {
     try {
@@ -175,10 +193,36 @@ function App() {
     wsRef.current = null;
     setScreenStream(null);
     setIsStreaming(false);
+    setStreamMode(null);
+  };
+
+  const startScreenShare = async () => {
+    try {
+      // Stop any active Omniverse session first
+      disconnectOmniverseStream();
+
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: "always", displaySurface: "monitor" },
+        audio: false,
+      });
+
+      setScreenStream(stream);
+      setIsStreaming(true);
+      setStreamMode("screen");
+
+      const [track] = stream.getVideoTracks();
+      if (track) track.onended = () => stopScreenShare();
+    } catch (err) {
+      console.error("Error starting screen share:", err);
+      alert("Failed to start screen sharing: " + err.message);
+    }
   };
 
   const connectOmniverseStream = async () => {
-    // Use env if you have it; otherwise your IP
+    // Stop any active screen-share first
+    stopScreenShare();
+
+    // Use env if set; otherwise your IP/port defaults
     const host = process.env.REACT_APP_OV_SIGNAL_HOST || "153.104.44.62";
     const port = process.env.REACT_APP_OV_SIGNAL_PORT || "49100";
     const proto = process.env.REACT_APP_OV_SIGNAL_PROTO || "ws";
@@ -202,6 +246,7 @@ function App() {
       if (stream) {
         setScreenStream(stream);
         setIsStreaming(true);
+        setStreamMode("omniverse");
       }
     };
 
@@ -213,8 +258,8 @@ function App() {
 
     ws.onopen = () => {
       console.log("Signaling connected.");
-      // Some Kit builds auto-send an SDP offer.
-      // If YOUR server requires a kickoff message, uncomment ONE of these:
+      // Some server builds require a kickoff message to request an offer.
+      // If you need it, uncomment ONE:
       // ws.send(JSON.stringify({ action: "request_offer" }));
       // ws.send(JSON.stringify({ type: "request_offer" }));
     };
@@ -230,12 +275,8 @@ function App() {
 
       console.log("Signal:", msg);
 
-      // Common patterns:
-      // 1) { sdp: { type: "offer", sdp: "..." } }
-      // 2) { type: "offer", sdp: "..." }
-      // 3) { candidate: { ... } } or { type:"candidate", candidate:{...} }
-
       try {
+        // Pattern A: { sdp: { type:"offer", sdp:"..." } }
         if (msg.sdp && msg.sdp.type) {
           await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
           const answer = await pc.createAnswer();
@@ -244,6 +285,7 @@ function App() {
           return;
         }
 
+        // Pattern B: { type:"offer", sdp:"..." }
         if (msg.type === "offer" && msg.sdp) {
           await pc.setRemoteDescription(
             new RTCSessionDescription({ type: "offer", sdp: msg.sdp })
@@ -254,7 +296,9 @@ function App() {
           return;
         }
 
-        const cand = msg.candidate || (msg.type === "candidate" ? msg.candidate : null);
+        // ICE candidates
+        const cand =
+          msg.candidate || (msg.type === "candidate" ? msg.candidate : null);
         if (cand) {
           await pc.addIceCandidate(new RTCIceCandidate(cand));
           return;
@@ -315,29 +359,44 @@ function App() {
     }
   };
 
+  const stopActiveStream = () => {
+    if (!isStreaming) return;
+    if (streamMode === "screen") stopScreenShare();
+    else disconnectOmniverseStream();
+  };
+
   return (
     <div className="App">
       {/* Background Stream */}
       <div className="stream-background">
         {isStreaming ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="stream-video"
-          />
+          <video ref={videoRef} autoPlay playsInline muted className="stream-video" />
         ) : (
           <div className="no-stream-overlay">
             <div className="start-prompt">
               <div className="prompt-icon">🛰️</div>
               <h2>Omniverse WebRTC Monitor</h2>
-              <p>Connect to the Omniverse WebRTC livestream server</p>
+              <p>Choose a stream source</p>
+
+              {/* Button 1: Omniverse */}
+              <button className="start-stream-button" onClick={connectOmniverseStream}>
+                ▶ Connect Omniverse Stream
+              </button>
+
+              <div style={{ height: 10 }} />
+
+              {/* Button 2: Desktop screen share */}
               <button
                 className="start-stream-button"
-                onClick={connectOmniverseStream}
+                onClick={startScreenShare}
+                style={{
+                  background: "rgba(255,255,255,0.10)",
+                  color: "var(--text-primary)",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  boxShadow: "none",
+                }}
               >
-                ▶ Connect Omniverse Stream
+                🖥️ Screen Share (Desktop)
               </button>
             </div>
           </div>
@@ -489,13 +548,26 @@ function App() {
         <div className="drag-handle panel-header-custom" title="Drag to move">
           <span className="panel-title">Dashboard Control</span>
 
-          {/* Streaming pill now controls Omniverse connection */}
+          {/* Streaming pill controls active stream mode */}
           <button
             className={`streaming-pill ${isStreaming ? "on" : "off"}`}
-            onClick={isStreaming ? disconnectOmniverseStream : connectOmniverseStream}
-            title={isStreaming ? "Click to disconnect" : "Click to connect"}
+            onClick={() => {
+              if (!isStreaming) {
+                // Default START = Omniverse (you can change to screen if you want)
+                connectOmniverseStream();
+              } else {
+                stopActiveStream();
+              }
+            }}
+            title={
+              isStreaming
+                ? streamMode === "screen"
+                  ? "Click to stop screen sharing"
+                  : "Click to disconnect Omniverse stream"
+                : "Click to start Omniverse stream"
+            }
           >
-            {isStreaming ? "STREAMING" : "START"}
+            {isStreaming ? (streamMode === "screen" ? "SCREEN" : "STREAMING") : "START"}
           </button>
         </div>
 
@@ -533,7 +605,7 @@ function App() {
         <div className="hud-content">{renderTabContent()}</div>
       </DraggableResizable>
 
-      {/* Bottom strip unchanged */}
+      {/* Bottom strip */}
       <div className="key-metrics-viewport">
         <div className="kms-item">
           <span className="kms-label">PUE</span>
