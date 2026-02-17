@@ -101,4 +101,31 @@ webrtc-react/
 
 ## License
 
-MIT
+This project is licensed under an **Academic Use License** - see the [LICENSE](LICENSE) file for details.
+
+### Key Points:
+- ✅ **Academic Use ONLY** - Free for educational and non-commercial research purposes
+- ❌ **No Commercial Use** - Commercial use is strictly prohibited
+- 📝 **Citation Required** - You must cite this work each time you use it
+
+### How to Cite
+
+When using this software in your academic work, please cite it as:
+
+```
+RGoharimehr. (2026). WebRTC React - Data Center Monitoring Dashboard. 
+GitHub repository. https://github.com/RGoharimehr/webrtc-react
+```
+
+**BibTeX entry:**
+```bibtex
+@software{webrtc_react,
+  author = {RGoharimehr},
+  title = {WebRTC React - Data Center Monitoring Dashboard},
+  year = {2026},
+  publisher = {GitHub},
+  url = {https://github.com/RGoharimehr/webrtc-react}
+}
+```
+
+For commercial use inquiries, please contact the repository owner.
