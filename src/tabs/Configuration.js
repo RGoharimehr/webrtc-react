@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 const Configuration = () => {
   const [config, setConfig] = useState({
@@ -11,10 +11,18 @@ const Configuration = () => {
 
   const [logs, setLogs] = useState('Configuration panel ready.\n');
   const [isExpanded, setIsExpanded] = useState(true);
+  const timerRef = useRef(null);
 
   const addLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => `${prev}[${timestamp}] ${message}\n`);
+    setLogs(prev => {
+      const lines = prev.split('\n');
+      // Keep only the last 199 lines, then add the new one (total: 200)
+      if (lines.length >= 200) {
+        lines.splice(0, lines.length - 199);
+      }
+      return lines.join('\n') + `[${timestamp}] ${message}\n`;
+    });
   };
 
   const browseFile = () => {
@@ -27,7 +35,7 @@ const Configuration = () => {
 
   const openProject = () => {
     addLog('Attempting to open project...');
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       setConfig(prev => ({ ...prev, status: 'Connected' }));
       addLog('Project opened successfully');
     }, 1000);
@@ -42,6 +50,15 @@ const Configuration = () => {
     addLog('Closing Flownex application...');
     setConfig(prev => ({ ...prev, status: 'Not Connected' }));
   };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div>

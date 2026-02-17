@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 const OperatingConditions = () => {
   const [params, setParams] = useState({
@@ -11,6 +11,7 @@ const OperatingConditions = () => {
 
   const [logs, setLogs] = useState('Ready to start simulation...\n');
   const [isSimulating, setIsSimulating] = useState(false);
+  const timerRef = useRef(null);
 
   const handleParamChange = (param, value) => {
     setParams(prev => ({ ...prev, [param]: value }));
@@ -19,19 +20,30 @@ const OperatingConditions = () => {
 
   const addLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => `${prev}[${timestamp}] ${message}\n`);
+    setLogs(prev => {
+      const lines = prev.split('\n');
+      // Keep only the last 199 lines, then add the new one (total: 200)
+      if (lines.length >= 200) {
+        lines.splice(0, lines.length - 199);
+      }
+      return lines.join('\n') + `[${timestamp}] ${message}\n`;
+    });
   };
 
   const startSimulation = () => {
     setIsSimulating(true);
     addLog('Starting transient simulation...');
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       addLog('Simulation running...');
     }, 1000);
   };
 
   const stopSimulation = () => {
     setIsSimulating(false);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     addLog('Simulation stopped.');
   };
 
@@ -48,10 +60,19 @@ const OperatingConditions = () => {
 
   const solveSteadyState = () => {
     addLog('Solving steady state...');
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       addLog('Steady state solution completed.');
     }, 2000);
   };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div>
