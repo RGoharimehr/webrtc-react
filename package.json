@@ -1,6 +1,23 @@
 {
-  "name": "webrtc-react",
+  "name": "kit-cae-webapp",
   "version": "0.1.0",
+  "description": "Web UI frontend for NVIDIA Omniverse kit-cae extension",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/NVIDIA-Omniverse/kit-cae",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RGoharimehr/webrtc-react.git"
+  },
+  "keywords": [
+    "omniverse",
+    "kit-cae",
+    "nvidia",
+    "cae",
+    "webrtc",
+    "react",
+    "data-center",
+    "monitoring"
+  ],
   "private": true,
   "dependencies": {
     "react": "^18.2.0",

@@ -12,6 +12,8 @@ import CFDAnalysis from "./tabs/CFDAnalysis";
 import GraphsPanel from "./components/GraphsPanel";
 import DraggableResizable from "./components/DraggableResizable";
 
+import kitClient from "./api/kitClient";
+
 /* =========================
    Mode and Tab Configuration
    ========================= */
@@ -99,6 +101,10 @@ function App() {
   // Ref to track current stream for cleanup
   const screenStreamRef = useRef(null);
 
+  // Kit API connection state
+  const [kitConnected, setKitConnected] = useState(false);
+  const [kitConnecting, setKitConnecting] = useState(false);
+
   // GraphsPanel API ref for data recording
   const graphsApiRef = useRef(null);
 
@@ -172,6 +178,34 @@ function App() {
     screenStreamRef.current = screenStream;
   }, [screenStream]);
 
+  // Setup Kit API event listeners
+  useEffect(() => {
+    const onConnect = () => {
+      setKitConnected(true);
+      setKitConnecting(false);
+    };
+
+    const onDisconnect = () => {
+      setKitConnected(false);
+      setKitConnecting(false);
+    };
+
+    const onError = (error) => {
+      console.error('Kit API error:', error);
+      setKitConnecting(false);
+    };
+
+    kitClient.on('connected', onConnect);
+    kitClient.on('disconnected', onDisconnect);
+    kitClient.on('error', onError);
+
+    return () => {
+      kitClient.off('connected', onConnect);
+      kitClient.off('disconnected', onDisconnect);
+      kitClient.off('error', onError);
+    };
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -187,6 +221,11 @@ function App() {
         }
       } catch (e) {
         console.warn("Cleanup error (stream):", e);
+      }
+      try {
+        kitClient.disconnect();
+      } catch (e) {
+        console.warn("Cleanup error (Kit API):", e);
       }
     };
   }, []);
@@ -341,6 +380,29 @@ function App() {
       console.log("Signaling closed.");
       disconnectOmniverseStream();
     };
+  };
+
+  // Kit API connection handlers
+  const connectKitAPI = async () => {
+    if (kitConnected || kitConnecting) {
+      return;
+    }
+
+    setKitConnecting(true);
+    try {
+      await kitClient.connect();
+      // Connection state will be updated via event listeners
+    } catch (err) {
+      console.error('Failed to connect to Kit API:', err);
+      alert(`Failed to connect to Kit API: ${err.message}`);
+      setKitConnecting(false);
+    }
+  };
+
+  const disconnectKitAPI = () => {
+    kitClient.disconnect();
+    setKitConnected(false);
+    setKitConnecting(false);
   };
 
   const tabs = MODE_TABS[activeMode];
@@ -597,6 +659,29 @@ function App() {
             }
           >
             {isStreaming ? (streamMode === "screen" ? "SCREEN" : "STREAMING") : "START"}
+          </button>
+
+          {/* Kit API connection pill */}
+          <button
+            className={`streaming-pill ${kitConnected ? "on" : "off"}`}
+            onClick={() => {
+              if (!kitConnected && !kitConnecting) {
+                connectKitAPI();
+              } else if (kitConnected) {
+                disconnectKitAPI();
+              }
+            }}
+            disabled={kitConnecting}
+            title={
+              kitConnected
+                ? "Kit API Connected - Click to disconnect"
+                : kitConnecting
+                ? "Connecting to Kit API..."
+                : "Click to connect to Kit API"
+            }
+            style={{ marginLeft: '8px' }}
+          >
+            {kitConnecting ? "CONNECTING..." : kitConnected ? "KIT API" : "CONNECT"}
           </button>
         </div>
 

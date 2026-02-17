@@ -1,0 +1,77 @@
+ACADEMIC USE LICENSE
+
+Copyright (c) 2026 RGoharimehr
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. DEFINITIONS
+
+"Software" refers to the WebRTC React application and all associated source code, 
+documentation, and materials in this repository.
+
+"Academic Use" means use for educational, teaching, or non-commercial research 
+purposes at an accredited academic institution.
+
+"Commercial Use" means any use intended for or directed toward commercial advantage 
+or monetary compensation.
+
+2. GRANT OF LICENSE
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of 
+this Software, to use, copy, modify, and distribute the Software, subject to the 
+following conditions:
+
+a) The Software may be used ONLY for Academic Use. Any Commercial Use is strictly 
+   prohibited without explicit written permission from the copyright holder.
+
+b) Each use of the Software, including in academic papers, presentations, theses, 
+   dissertations, or any other academic work, MUST include proper citation.
+
+3. CITATION REQUIREMENT
+
+When using this Software, you MUST cite it as follows:
+
+   RGoharimehr. (2026). WebRTC React - Data Center Monitoring Dashboard. 
+   GitHub repository. https://github.com/RGoharimehr/webrtc-react
+
+For academic publications, use the following BibTeX entry:
+
+   @software{webrtc_react,
+     author = {RGoharimehr},
+     title = {WebRTC React - Data Center Monitoring Dashboard},
+     year = {2026},
+     publisher = {GitHub},
+     url = {https://github.com/RGoharimehr/webrtc-react}
+   }
+
+4. CONDITIONS
+
+The above copyright notice, this license, and the citation requirement must be 
+included in all copies or substantial portions of the Software.
+
+5. COMMERCIAL USE PROHIBITION
+
+Commercial Use of the Software is strictly prohibited. This includes, but is not 
+limited to:
+
+- Using the Software in a commercial product or service
+- Using the Software to provide commercial services
+- Selling the Software or derivatives of the Software
+- Using the Software in any for-profit organization
+
+For inquiries regarding Commercial Use, please contact the copyright holder.
+
+6. DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. TERMINATION
+
+This license automatically terminates if you fail to comply with any of its terms 
+and conditions. Upon termination, you must cease all use of the Software and 
+destroy all copies in your possession.
