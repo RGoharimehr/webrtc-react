@@ -92,7 +92,7 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
           alert(`✅ Recording saved to: ${result.filePath}\n\nThe file has been saved on the server.`);
         } else if (result.base64) {
           // Backend returned base64 data - download it
-          const filename = result.filename || `OmniCool_Record_${new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '').replace('T', '_')}.xlsx`;
+          const filename = result.filename || generateTimestampedFilename('OmniCool_Record', 'xlsx');
           downloadBase64File(result.base64, filename);
           alert(`✅ Recording exported! ${result.sampleCount || 'Multiple'} samples captured.`);
         } else {
@@ -122,6 +122,15 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
       // Export to XLSX
       await exportToXLSX(recordedDataRef.current);
     }
+  };
+
+  const generateTimestampedFilename = (prefix, extension) => {
+    const now = new Date();
+    const timestamp = now.toISOString()
+      .replace(/:/g, '-')
+      .replace(/\..+/, '')
+      .replace('T', '_');
+    return `${prefix}_${timestamp}.${extension}`;
   };
 
   const downloadBase64File = (base64Data, filename) => {
@@ -190,13 +199,8 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Recording');
 
-    // Generate filename with timestamp (format: YYYY-MM-DD_HH-mm-ss)
-    const now = new Date();
-    const timestamp = now.toISOString()
-      .replace(/:/g, '-')      // Replace colons with hyphens
-      .replace(/\..+/, '')     // Remove milliseconds
-      .replace('T', '_');      // Replace T with underscore
-    const filename = `omnicool_recording_${timestamp}.xlsx`;
+    // Generate filename with timestamp
+    const filename = generateTimestampedFilename('omnicool_recording', 'xlsx');
 
     // Try File System Access API first (modern browsers)
     if (window.showSaveFilePicker) {

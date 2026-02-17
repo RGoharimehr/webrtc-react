@@ -16,6 +16,23 @@ const GraphsPanel = React.memo(
     const iterationRef = useRef(0);
     const timeRef = useRef(0);
 
+    // Track connection status
+    useEffect(() => {
+      const onConnected = () => setUseBackend(true);
+      const onDisconnected = () => setUseBackend(false);
+
+      kitClient.on('connected', onConnected);
+      kitClient.on('disconnected', onDisconnected);
+
+      // Set initial state
+      setUseBackend(kitClient.isConnected);
+
+      return () => {
+        kitClient.off('connected', onConnected);
+        kitClient.off('disconnected', onDisconnected);
+      };
+    }, []);
+
     // Handle backend push updates
     useEffect(() => {
       const handleOutputs = (payload) => {
@@ -43,9 +60,7 @@ const GraphsPanel = React.memo(
     useEffect(() => {
       let interval;
 
-      if (kitClient.isConnected) {
-        setUseBackend(true);
-        
+      if (useBackend) {
         // Poll outputs.get every 500ms
         interval = setInterval(async () => {
           try {
@@ -66,8 +81,6 @@ const GraphsPanel = React.memo(
           }
         }, 500);
       } else {
-        setUseBackend(false);
-        
         // Simulate live data updates every 500ms (local mode)
         interval = setInterval(() => {
           setLiveData((prev) => ({
@@ -83,7 +96,7 @@ const GraphsPanel = React.memo(
       }
 
       return () => clearInterval(interval);
-    }, [kitClient.isConnected]);
+    }, [useBackend]);
 
     // Expose API to parent via ref
     useImperativeHandle(ref, () => ({

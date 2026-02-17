@@ -17,6 +17,37 @@ const Configuration = () => {
 
   // Fetch config from backend on mount and connection changes
   useEffect(() => {
+    const fetchConfigFromBackend = async () => {
+      try {
+        const backendConfig = await kitClient.getConfig();
+        if (backendConfig) {
+          setConfig(prev => ({
+            ...prev,
+            projectFile: backendConfig.projectFile || prev.projectFile,
+            ioDirectory: backendConfig.ioDirectory || prev.ioDirectory,
+            solveOnChange: backendConfig.solveOnChange !== undefined ? backendConfig.solveOnChange : prev.solveOnChange,
+            dataInterval: backendConfig.dataInterval || prev.dataInterval
+          }));
+          addLog('✅ Configuration loaded from backend');
+        }
+      } catch (err) {
+        addLog(`❌ Failed to fetch config: ${err.message}`);
+        console.error('Failed to fetch config:', err);
+      }
+    };
+
+    const fetchStatusFromBackend = async () => {
+      try {
+        const status = await kitClient.getStatus();
+        if (status) {
+          addLog(`Backend status: ${status.state || 'unknown'}`);
+        }
+      } catch (err) {
+        addLog(`❌ Failed to fetch status: ${err.message}`);
+        console.error('Failed to fetch status:', err);
+      }
+    };
+
     const updateBackendStatus = async () => {
       if (kitClient.isConnected) {
         setUseBackend(true);
@@ -45,38 +76,8 @@ const Configuration = () => {
       kitClient.off('connected', onConnected);
       kitClient.off('disconnected', onDisconnected);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const fetchConfigFromBackend = async () => {
-    try {
-      const backendConfig = await kitClient.getConfig();
-      if (backendConfig) {
-        setConfig(prev => ({
-          ...prev,
-          projectFile: backendConfig.projectFile || prev.projectFile,
-          ioDirectory: backendConfig.ioDirectory || prev.ioDirectory,
-          solveOnChange: backendConfig.solveOnChange !== undefined ? backendConfig.solveOnChange : prev.solveOnChange,
-          dataInterval: backendConfig.dataInterval || prev.dataInterval
-        }));
-        addLog('✅ Configuration loaded from backend');
-      }
-    } catch (err) {
-      addLog(`❌ Failed to fetch config: ${err.message}`);
-      console.error('Failed to fetch config:', err);
-    }
-  };
-
-  const fetchStatusFromBackend = async () => {
-    try {
-      const status = await kitClient.getStatus();
-      if (status) {
-        addLog(`Backend status: ${status.state || 'unknown'}`);
-      }
-    } catch (err) {
-      addLog(`❌ Failed to fetch status: ${err.message}`);
-      console.error('Failed to fetch status:', err);
-    }
-  };
 
   const handleConfigChange = async (field, value) => {
     setConfig(prev => ({ ...prev, [field]: value }));

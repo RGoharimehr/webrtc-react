@@ -15,6 +15,19 @@ const ResultsVisualization = () => {
 
   // Check backend connection
   useEffect(() => {
+    const fetchVizOptions = async () => {
+      try {
+        const options = await kitClient.getVizOptions();
+        if (options) {
+          addLog('✅ Visualization options loaded from backend');
+          // Could update available properties/colormaps here if backend provides them
+        }
+      } catch (err) {
+        addLog(`❌ Failed to fetch viz options: ${err.message}`);
+        console.error('Failed to fetch viz options:', err);
+      }
+    };
+
     setUseBackend(kitClient.isConnected);
 
     const onConnected = () => {
@@ -39,20 +52,8 @@ const ResultsVisualization = () => {
       kitClient.off('connected', onConnected);
       kitClient.off('disconnected', onDisconnected);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const fetchVizOptions = async () => {
-    try {
-      const options = await kitClient.getVizOptions();
-      if (options) {
-        addLog('✅ Visualization options loaded from backend');
-        // Could update available properties/colormaps here if backend provides them
-      }
-    } catch (err) {
-      addLog(`❌ Failed to fetch viz options: ${err.message}`);
-      console.error('Failed to fetch viz options:', err);
-    }
-  };
 
   const addLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();

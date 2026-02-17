@@ -17,6 +17,26 @@ const OperatingConditions = () => {
 
   // Fetch initial inputs from backend on mount if connected
   useEffect(() => {
+    const fetchInputsFromBackend = async () => {
+      try {
+        addLog('Fetching inputs from backend...');
+        const response = await kitClient.getInputs();
+        if (response) {
+          setParams({
+            ambientTemp: response.ambientTemp || params.ambientTemp,
+            deltaTemp: response.deltaTemp || params.deltaTemp,
+            fanRPM: response.fanRPM || params.fanRPM,
+            heatLoad: response.heatLoad || params.heatLoad,
+            humidity: response.humidity || params.humidity
+          });
+          addLog('✅ Inputs loaded from backend');
+        }
+      } catch (err) {
+        addLog(`❌ Failed to fetch inputs: ${err.message}`);
+        console.error('Failed to fetch inputs:', err);
+      }
+    };
+
     if (kitClient.isConnected) {
       setUseBackend(true);
       fetchInputsFromBackend();
@@ -40,27 +60,8 @@ const OperatingConditions = () => {
       kitClient.off('connected', onConnected);
       kitClient.off('disconnected', onDisconnected);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const fetchInputsFromBackend = async () => {
-    try {
-      addLog('Fetching inputs from backend...');
-      const response = await kitClient.getInputs();
-      if (response) {
-        setParams({
-          ambientTemp: response.ambientTemp || params.ambientTemp,
-          deltaTemp: response.deltaTemp || params.deltaTemp,
-          fanRPM: response.fanRPM || params.fanRPM,
-          heatLoad: response.heatLoad || params.heatLoad,
-          humidity: response.humidity || params.humidity
-        });
-        addLog('✅ Inputs loaded from backend');
-      }
-    } catch (err) {
-      addLog(`❌ Failed to fetch inputs: ${err.message}`);
-      console.error('Failed to fetch inputs:', err);
-    }
-  };
 
   const handleParamChange = async (param, value) => {
     setParams(prev => ({ ...prev, [param]: value }));
