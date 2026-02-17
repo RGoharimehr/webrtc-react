@@ -1,10 +1,14 @@
-# WebRTC React - Data Center Monitoring Dashboard
+# kit-cae Web UI
 
-A modern React application for data center monitoring with WebRTC screen sharing, live metrics visualization, and data recording capabilities. The app connects to an Omniverse Kit extension backend via WebSocket API for real-time simulation control and data streaming.
+**Frontend Web Application for NVIDIA Omniverse kit-cae Extension**
+
+A modern React-based web interface for the NVIDIA Omniverse kit-cae (Computer-Aided Engineering) extension. This application provides data center monitoring with WebRTC screen sharing, live metrics visualization, and data recording capabilities.
+
+> **Note:** This webapp is designed to work with the [NVIDIA-Omniverse/kit-cae](https://github.com/NVIDIA-Omniverse/kit-cae) extension. For integration instructions, see [INTEGRATION.md](INTEGRATION.md).
 
 ## Architecture
 
-This React web app acts as a **thin client UI** that communicates with an Omniverse Kit extension backend:
+This React web app acts as a **thin client UI** that communicates with the kit-cae Omniverse Kit extension backend:
 
 - **WebSocket API** (port 49080): Control/data communication with Kit extension
   - Real-time simulation control (start/stop transient, load steady state)
@@ -22,13 +26,26 @@ This React web app acts as a **thin client UI** that communicates with an Omnive
 
 - Node.js 14 or higher
 - npm (comes with Node.js)
+- NVIDIA Omniverse kit-cae extension running with WebSocket API enabled
 
 ## Installation
+
+### Standalone Installation
 
 1. Clone the repository:
 ```bash
 git clone https://github.com/RGoharimehr/webrtc-react.git
 cd webrtc-react
+```
+
+### Installation within kit-cae Repository
+
+If you're integrating this webapp into the kit-cae repository, see [INTEGRATION.md](INTEGRATION.md) for detailed instructions.
+
+For development within kit-cae:
+```bash
+cd kit-cae/webapp  # Assuming webapp is in kit-cae/webapp/
+npm install
 ```
 
 2. Install dependencies:
@@ -40,20 +57,30 @@ npm install
 
 ## Configuration
 
+### Backend Connection
+
+This webapp connects to the NVIDIA Omniverse kit-cae extension backend. The kit-cae extension must implement the WebSocket API protocol as documented below.
+
 The application uses environment variables to configure backend connections. Edit `.env` file:
 
 ```bash
-# WebRTC Signaling Server (for video streaming)
-REACT_APP_OV_SIGNAL_HOST=153.104.44.62
-REACT_APP_OV_SIGNAL_PORT=49100
-
-# Kit API WebSocket (for control/data)
-REACT_APP_KIT_API_HOST=153.104.44.62
+# Kit CAE Extension Backend (WebSocket API for control/data)
+REACT_APP_KIT_API_HOST=localhost
 REACT_APP_KIT_API_PORT=49080
 REACT_APP_KIT_API_PROTO=ws
+
+# WebRTC Signaling Server (for video streaming from Omniverse)
+REACT_APP_OV_SIGNAL_HOST=localhost
+REACT_APP_OV_SIGNAL_PORT=49100
 ```
 
-**Note:** Change the host IP address to match your Omniverse Kit extension server.
+**Configuration Options:**
+
+- For **local development**: Use `localhost`
+- For **remote kit-cae server**: Use the server's IP address (e.g., `192.168.1.100`)
+- For **production deployment**: Use the production server hostname or IP
+
+**Note:** The kit-cae extension must be running with the WebSocket server enabled on the specified ports.
 
 ## Running the Application
 
@@ -64,6 +91,29 @@ npm start
 ```
 
 The application will open at `http://localhost:3000`
+
+### Connecting to kit-cae Backend
+
+1. **Start the kit-cae extension** with WebSocket server enabled:
+   ```bash
+   # In the kit-cae repository
+   ./omni.sh --ext-folder exts --enable omni.cdu.physics
+   ```
+
+2. **Start the webapp** (in a separate terminal):
+   ```bash
+   npm start
+   ```
+
+3. **Connect in the browser:**
+   - Open http://localhost:3000
+   - Click the "CONNECT" button in the Dashboard Control panel
+   - You should see "KIT API" status change to connected
+
+**Troubleshooting Connection:**
+- Ensure kit-cae extension WebSocket server is running on port 49080
+- Check firewall settings allow connections on ports 49080 and 49100
+- Verify the `.env` configuration matches your backend setup
 
 ## Available Scripts
 
