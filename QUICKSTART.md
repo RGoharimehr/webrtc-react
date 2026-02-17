@@ -100,7 +100,7 @@ Make sure these match your kit-cae extension configuration.
 
 ### Webapp won't connect to backend
 
-- **Check backend is running:** `curl http://localhost:49080` should respond
+- **Check backend is running:** Use `netstat -an | grep 49080` to verify the WebSocket server is listening
 - **Check firewall:** Ensure ports 49080 and 49100 are open
 - **Check .env file:** Verify host and port settings
 - **Check browser console:** Open DevTools (F12) and look for connection errors

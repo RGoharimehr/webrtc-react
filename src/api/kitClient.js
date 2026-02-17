@@ -20,7 +20,7 @@ class KitClient {
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000; // ms
     this.reconnectTimer = null;
-    this.requestTimeout = 30000; // 30 seconds
+    this.requestTimeout = parseInt(process.env.REACT_APP_KIT_API_TIMEOUT) || 30000; // 30 seconds default
     this.autoReconnect = true;
     
     // Connection settings from environment
