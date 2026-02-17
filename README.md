@@ -4,7 +4,21 @@
 
 A modern React-based web interface for the NVIDIA Omniverse kit-cae (Computer-Aided Engineering) extension. This application provides data center monitoring with WebRTC screen sharing, live metrics visualization, and data recording capabilities.
 
-> **Note:** This webapp is designed to work with the [NVIDIA-Omniverse/kit-cae](https://github.com/NVIDIA-Omniverse/kit-cae) extension. For integration instructions, see [INTEGRATION.md](INTEGRATION.md).
+---
+
+## 🔗 Integration with kit-cae
+
+> **Important:** This webapp is designed to be integrated into the [NVIDIA-Omniverse/kit-cae](https://github.com/NVIDIA-Omniverse/kit-cae) repository as the web-based frontend UI.
+
+**Quick Links:**
+- 📖 **[Quick Start Guide](QUICKSTART.md)** - Get up and running in 3 steps
+- 🔧 **[Integration Guide](INTEGRATION.md)** - How to add this webapp to kit-cae
+- 🎯 **[Backend API Spec](KIT_CAE_BACKEND_API.md)** - Requirements for kit-cae extension
+- 👥 **[For Maintainers](FOR_KIT_CAE_MAINTAINERS.md)** - Integration steps for kit-cae maintainers
+
+**Status:** This webapp is currently in a separate repository but is intended to be part of the kit-cae project.
+
+---
 
 ## Architecture
 
