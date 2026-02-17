@@ -1,23 +1,41 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import kitClient from '../api/kitClient';
 
 const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => {
   const [xAxis, setXAxis] = useState('time');
   const [isRecording, setIsRecording] = useState(false);
   const [sampleCount, setSampleCount] = useState(0);
+  const [useBackend, setUseBackend] = useState(false);
   const recordedDataRef = useRef([]);
   const recordingIntervalRef = useRef(null);
+
+  // Check backend connection
+  useEffect(() => {
+    setUseBackend(kitClient.isConnected);
+
+    const onConnected = () => {
+      setUseBackend(true);
+    };
+
+    const onDisconnected = () => {
+      setUseBackend(false);
+    };
+
+    kitClient.on('connected', onConnected);
+    kitClient.on('disconnected', onDisconnected);
+
+    return () => {
+      kitClient.off('connected', onConnected);
+      kitClient.off('disconnected', onDisconnected);
+    };
+  }, []);
 
   const toggleVariable = (variable) => {
     setPlottingVariables(prev => ({ ...prev, [variable]: !prev[variable] }));
   };
 
-  const startRecording = () => {
-    if (!graphsApiRef?.current) {
-      alert('Data source not available. Please wait for the application to fully load.');
-      return;
-    }
-
+  const startRecording = async () => {
     // Check if at least one variable is selected
     const hasSelectedVariable = Object.values(plottingVariables).some(v => v);
     if (!hasSelectedVariable) {
@@ -25,35 +43,115 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
       return;
     }
 
-    recordedDataRef.current = [];
-    setSampleCount(0);
-    setIsRecording(true);
-
-    // Start recording samples every 500ms
-    recordingIntervalRef.current = setInterval(() => {
-      if (graphsApiRef.current) {
-        const data = graphsApiRef.current.getCurrentData();
-        recordedDataRef.current.push(data);
-        setSampleCount(prev => prev + 1);
+    if (useBackend) {
+      // Use backend recording
+      try {
+        const selectedVariables = Object.keys(plottingVariables).filter(k => plottingVariables[k]);
+        await kitClient.startRecording({
+          xAxis,
+          variables: selectedVariables
+        });
+        setIsRecording(true);
+        setSampleCount(0);
+        alert('✅ Recording started on backend');
+      } catch (err) {
+        alert(`Failed to start recording: ${err.message}`);
+        console.error('Failed to start recording:', err);
       }
-    }, 500);
+    } else {
+      // Use local recording
+      if (!graphsApiRef?.current) {
+        alert('Data source not available. Please wait for the application to fully load.');
+        return;
+      }
+
+      recordedDataRef.current = [];
+      setSampleCount(0);
+      setIsRecording(true);
+
+      // Start recording samples every 500ms
+      recordingIntervalRef.current = setInterval(() => {
+        if (graphsApiRef.current) {
+          const data = graphsApiRef.current.getCurrentData();
+          recordedDataRef.current.push(data);
+          setSampleCount(prev => prev + 1);
+        }
+      }, 500);
+    }
   };
 
   const stopRecording = async () => {
-    if (recordingIntervalRef.current) {
-      clearInterval(recordingIntervalRef.current);
-      recordingIntervalRef.current = null;
+    if (useBackend) {
+      // Stop backend recording and get export
+      try {
+        const result = await kitClient.stopRecording();
+        setIsRecording(false);
+        
+        if (result.filePath) {
+          // Backend saved to a file path
+          alert(`✅ Recording saved to: ${result.filePath}\n\nThe file has been saved on the server.`);
+        } else if (result.base64) {
+          // Backend returned base64 data - download it
+          const filename = result.filename || generateTimestampedFilename('OmniCool_Record', 'xlsx');
+          downloadBase64File(result.base64, filename);
+          alert(`✅ Recording exported! ${result.sampleCount || 'Multiple'} samples captured.`);
+        } else {
+          alert('✅ Recording stopped on backend');
+        }
+        
+        setSampleCount(result.sampleCount || 0);
+      } catch (err) {
+        alert(`Failed to stop recording: ${err.message}`);
+        console.error('Failed to stop recording:', err);
+        setIsRecording(false);
+      }
+    } else {
+      // Stop local recording
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+
+      setIsRecording(false);
+
+      if (recordedDataRef.current.length === 0) {
+        alert('No data recorded. Please start recording first.');
+        return;
+      }
+
+      // Export to XLSX
+      await exportToXLSX(recordedDataRef.current);
     }
+  };
 
-    setIsRecording(false);
+  const generateTimestampedFilename = (prefix, extension) => {
+    const now = new Date();
+    const timestamp = now.toISOString()
+      .replace(/:/g, '-')
+      .replace(/\..+/, '')
+      .replace('T', '_');
+    return `${prefix}_${timestamp}.${extension}`;
+  };
 
-    if (recordedDataRef.current.length === 0) {
-      alert('No data recorded. Please start recording first.');
-      return;
+  const downloadBase64File = (base64Data, filename) => {
+    // Convert base64 to blob
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
-
-    // Export to XLSX
-    await exportToXLSX(recordedDataRef.current);
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const exportToXLSX = async (data) => {
@@ -101,13 +199,8 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Recording');
 
-    // Generate filename with timestamp (format: YYYY-MM-DD_HH-mm-ss)
-    const now = new Date();
-    const timestamp = now.toISOString()
-      .replace(/:/g, '-')      // Replace colons with hyphens
-      .replace(/\..+/, '')     // Remove milliseconds
-      .replace('T', '_');      // Replace T with underscore
-    const filename = `omnicool_recording_${timestamp}.xlsx`;
+    // Generate filename with timestamp
+    const filename = generateTimestampedFilename('omnicool_recording', 'xlsx');
 
     // Try File System Access API first (modern browsers)
     if (window.showSaveFilePicker) {

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import kitClient from '../api/kitClient';
 
 const ResultsVisualization = () => {
   const [vizSettings, setVizSettings] = useState({
@@ -10,6 +11,60 @@ const ResultsVisualization = () => {
   });
 
   const [logs, setLogs] = useState('');
+  const [useBackend, setUseBackend] = useState(false);
+
+  // Check backend connection
+  useEffect(() => {
+    const fetchVizOptions = async () => {
+      try {
+        const options = await kitClient.getVizOptions();
+        if (options) {
+          addLog('✅ Visualization options loaded from backend');
+          // Could update available properties/colormaps here if backend provides them
+        }
+      } catch (err) {
+        addLog(`❌ Failed to fetch viz options: ${err.message}`);
+        console.error('Failed to fetch viz options:', err);
+      }
+    };
+
+    setUseBackend(kitClient.isConnected);
+
+    const onConnected = () => {
+      setUseBackend(true);
+      addLog('Backend connected');
+      fetchVizOptions();
+    };
+
+    const onDisconnected = () => {
+      setUseBackend(false);
+      addLog('Backend disconnected - using local mode');
+    };
+
+    kitClient.on('connected', onConnected);
+    kitClient.on('disconnected', onDisconnected);
+
+    if (kitClient.isConnected) {
+      fetchVizOptions();
+    }
+
+    return () => {
+      kitClient.off('connected', onConnected);
+      kitClient.off('disconnected', onDisconnected);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const addLog = (message) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setLogs(prev => {
+      const lines = prev.split('\n');
+      if (lines.length >= 200) {
+        lines.splice(0, lines.length - 199);
+      }
+      return lines.join('\n') + `\n[${timestamp}] ${message}`;
+    });
+  };
 
   // Colormap definitions
   const colormaps = {
@@ -20,16 +75,75 @@ const ResultsVisualization = () => {
     viridis: 'linear-gradient(to right, #440154, #31688e, #35b779, #fde724)'
   };
 
-  const applyVisualization = () => {
+  const handlePropertyChange = async (property) => {
+    setVizSettings(prev => ({ ...prev, property }));
+    
+    if (useBackend) {
+      try {
+        await kitClient.setVizProperty(property);
+        addLog(`✅ Property set to ${property} on backend`);
+      } catch (err) {
+        addLog(`❌ Failed to set property: ${err.message}`);
+        console.error('Failed to set viz property:', err);
+      }
+    }
+  };
+
+  const handleColormapChange = async (colormap) => {
+    setVizSettings(prev => ({ ...prev, colormap }));
+    
+    if (useBackend) {
+      // Apply colormap with current bounds
+      await applyColormapToBackend(colormap, vizSettings.manualBounds, vizSettings.minBound, vizSettings.maxBound);
+    }
+  };
+
+  const handleBoundsChange = (field, value) => {
+    setVizSettings(prev => ({ ...prev, [field]: value }));
+  };
+
+  const applyColormapToBackend = async (colormap, useBounds, minBound, maxBound) => {
+    try {
+      const min = useBounds ? minBound : undefined;
+      const max = useBounds ? maxBound : undefined;
+      await kitClient.setVizColormap(colormap, min, max);
+      addLog(`✅ Colormap ${colormap} applied on backend`);
+    } catch (err) {
+      addLog(`❌ Failed to set colormap: ${err.message}`);
+      console.error('Failed to set viz colormap:', err);
+    }
+  };
+
+  const applyVisualization = async () => {
     const timestamp = new Date().toLocaleTimeString();
+    const message = `Applied visualization: ${vizSettings.property} with ${vizSettings.colormap} colormap`;
     setLogs(prev => {
       const lines = prev.split('\n');
       // Keep only the last 199 lines, then add the new one (total: 200)
       if (lines.length >= 200) {
         lines.splice(0, lines.length - 199);
       }
-      return lines.join('\n') + `\n[${timestamp}] Applied visualization: ${vizSettings.property} with ${vizSettings.colormap} colormap`;
+      return lines.join('\n') + `\n[${timestamp}] ${message}`;
     });
+
+    if (useBackend) {
+      try {
+        // Set property and colormap
+        await kitClient.setVizProperty(vizSettings.property);
+        await applyColormapToBackend(
+          vizSettings.colormap,
+          vizSettings.manualBounds,
+          vizSettings.minBound,
+          vizSettings.maxBound
+        );
+        // Refresh visualization
+        await kitClient.refreshViz();
+        addLog('✅ Visualization refreshed on backend');
+      } catch (err) {
+        addLog(`❌ Failed to apply visualization: ${err.message}`);
+        console.error('Failed to apply visualization:', err);
+      }
+    }
   };
 
   return (
@@ -42,7 +156,7 @@ const ResultsVisualization = () => {
           <select 
             style={{ flex: 1 }}
             value={vizSettings.property}
-            onChange={(e) => setVizSettings({...vizSettings, property: e.target.value})}
+            onChange={(e) => handlePropertyChange(e.target.value)}
           >
             <option value="temperature">Temperature</option>
             <option value="pressure">Pressure</option>
@@ -56,7 +170,7 @@ const ResultsVisualization = () => {
           <select 
             style={{ flex: 1 }}
             value={vizSettings.colormap}
-            onChange={(e) => setVizSettings({...vizSettings, colormap: e.target.value})}
+            onChange={(e) => handleColormapChange(e.target.value)}
           >
             <option value="jet">Jet</option>
             <option value="rainbow">Rainbow</option>
@@ -71,7 +185,7 @@ const ResultsVisualization = () => {
             <input
               type="checkbox"
               checked={vizSettings.manualBounds}
-              onChange={(e) => setVizSettings({...vizSettings, manualBounds: e.target.checked})}
+              onChange={(e) => handleBoundsChange('manualBounds', e.target.checked)}
             />
             Set Manual Bounds
           </label>
@@ -84,7 +198,7 @@ const ResultsVisualization = () => {
               <input
                 type="number"
                 value={vizSettings.minBound}
-                onChange={(e) => setVizSettings({...vizSettings, minBound: parseFloat(e.target.value)})}
+                onChange={(e) => handleBoundsChange('minBound', parseFloat(e.target.value))}
                 style={{ width: '150px' }}
               />
             </div>
@@ -93,7 +207,7 @@ const ResultsVisualization = () => {
               <input
                 type="number"
                 value={vizSettings.maxBound}
-                onChange={(e) => setVizSettings({...vizSettings, maxBound: parseFloat(e.target.value)})}
+                onChange={(e) => handleBoundsChange('maxBound', parseFloat(e.target.value))}
                 style={{ width: '150px' }}
               />
             </div>

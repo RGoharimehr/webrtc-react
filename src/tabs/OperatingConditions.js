@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import kitClient from '../api/kitClient';
 
 const OperatingConditions = () => {
   const [params, setParams] = useState({
@@ -11,11 +12,71 @@ const OperatingConditions = () => {
 
   const [logs, setLogs] = useState('Ready to start simulation...\n');
   const [isSimulating, setIsSimulating] = useState(false);
+  const [useBackend, setUseBackend] = useState(false);
   const timerRef = useRef(null);
 
-  const handleParamChange = (param, value) => {
+  // Fetch initial inputs from backend on mount if connected
+  useEffect(() => {
+    const fetchInputsFromBackend = async () => {
+      try {
+        addLog('Fetching inputs from backend...');
+        const response = await kitClient.getInputs();
+        if (response) {
+          setParams({
+            ambientTemp: response.ambientTemp || params.ambientTemp,
+            deltaTemp: response.deltaTemp || params.deltaTemp,
+            fanRPM: response.fanRPM || params.fanRPM,
+            heatLoad: response.heatLoad || params.heatLoad,
+            humidity: response.humidity || params.humidity
+          });
+          addLog('✅ Inputs loaded from backend');
+        }
+      } catch (err) {
+        addLog(`❌ Failed to fetch inputs: ${err.message}`);
+        console.error('Failed to fetch inputs:', err);
+      }
+    };
+
+    if (kitClient.isConnected) {
+      setUseBackend(true);
+      fetchInputsFromBackend();
+    }
+
+    // Listen for connection events
+    const onConnected = () => {
+      setUseBackend(true);
+      fetchInputsFromBackend();
+    };
+
+    const onDisconnected = () => {
+      setUseBackend(false);
+      addLog('Backend disconnected - using local mode');
+    };
+
+    kitClient.on('connected', onConnected);
+    kitClient.on('disconnected', onDisconnected);
+
+    return () => {
+      kitClient.off('connected', onConnected);
+      kitClient.off('disconnected', onDisconnected);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleParamChange = async (param, value) => {
     setParams(prev => ({ ...prev, [param]: value }));
     addLog(`${param} set to ${value}`);
+
+    // Send to backend if connected
+    if (useBackend) {
+      try {
+        await kitClient.setInputs({ [param]: value });
+        addLog(`✅ ${param} updated on backend`);
+      } catch (err) {
+        addLog(`❌ Failed to update ${param}: ${err.message}`);
+        console.error('Failed to set input:', err);
+      }
+    }
   };
 
   const addLog = (message) => {
@@ -30,39 +91,83 @@ const OperatingConditions = () => {
     });
   };
 
-  const startSimulation = () => {
+  const startSimulation = async () => {
     setIsSimulating(true);
     addLog('Starting transient simulation...');
-    timerRef.current = setTimeout(() => {
-      addLog('Simulation running...');
-    }, 1000);
-  };
 
-  const stopSimulation = () => {
-    setIsSimulating(false);
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+    if (useBackend) {
+      try {
+        await kitClient.startTransient();
+        addLog('✅ Transient simulation started on backend');
+      } catch (err) {
+        addLog(`❌ Failed to start simulation: ${err.message}`);
+        console.error('Failed to start simulation:', err);
+        setIsSimulating(false);
+      }
+    } else {
+      timerRef.current = setTimeout(() => {
+        addLog('Simulation running (local mode)...');
+      }, 1000);
     }
-    addLog('Simulation stopped.');
   };
 
-  const loadDefaults = () => {
-    setParams({
+  const stopSimulation = async () => {
+    if (useBackend) {
+      try {
+        await kitClient.stopTransient();
+        addLog('✅ Transient simulation stopped');
+      } catch (err) {
+        addLog(`❌ Failed to stop simulation: ${err.message}`);
+        console.error('Failed to stop simulation:', err);
+      }
+    } else {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      addLog('Simulation stopped (local mode).');
+    }
+    setIsSimulating(false);
+  };
+
+  const loadDefaults = async () => {
+    const defaults = {
       ambientTemp: 25,
       deltaTemp: 15,
       fanRPM: 500,
       heatLoad: 125,
       humidity: 50
-    });
+    };
+    setParams(defaults);
     addLog('Loaded default values.');
+
+    if (useBackend) {
+      try {
+        await kitClient.setInputs(defaults);
+        addLog('✅ Defaults sent to backend');
+      } catch (err) {
+        addLog(`❌ Failed to send defaults: ${err.message}`);
+        console.error('Failed to send defaults:', err);
+      }
+    }
   };
 
-  const solveSteadyState = () => {
+  const solveSteadyState = async () => {
     addLog('Solving steady state...');
-    timerRef.current = setTimeout(() => {
-      addLog('Steady state solution completed.');
-    }, 2000);
+
+    if (useBackend) {
+      try {
+        await kitClient.loadSteadyState();
+        addLog('✅ Steady state solution completed');
+      } catch (err) {
+        addLog(`❌ Failed to solve steady state: ${err.message}`);
+        console.error('Failed to solve steady state:', err);
+      }
+    } else {
+      timerRef.current = setTimeout(() => {
+        addLog('Steady state solution completed (local mode).');
+      }, 2000);
+    }
   };
 
   // Cleanup timers on unmount
