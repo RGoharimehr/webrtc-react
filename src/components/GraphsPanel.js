@@ -1,4 +1,5 @@
 import React, { useMemo, useImperativeHandle, useRef, useState, useEffect } from "react";
+import kitClient from "../api/kitClient";
 
 const GraphsPanel = React.memo(
   React.forwardRef(({ plottingVariables }, ref) => {
@@ -11,25 +12,78 @@ const GraphsPanel = React.memo(
       humidity: 52,
     });
 
+    const [useBackend, setUseBackend] = useState(false);
     const iterationRef = useRef(0);
     const timeRef = useRef(0);
 
-    // Simulate live data updates every 500ms
+    // Handle backend push updates
     useEffect(() => {
-      const interval = setInterval(() => {
-        setLiveData((prev) => ({
-          temperature: Math.max(20, Math.min(90, prev.temperature + (Math.random() - 0.5) * 2)),
-          power: Math.max(0, Math.min(200, prev.power + (Math.random() - 0.5) * 3)),
-          pressure: Math.max(0.8, Math.min(2.8, prev.pressure + (Math.random() - 0.5) * 0.1)),
-          velocity: Math.max(0, Math.min(6, prev.velocity + (Math.random() - 0.5) * 0.3)),
-          humidity: Math.max(0, Math.min(100, prev.humidity + (Math.random() - 0.5) * 1.5)),
-        }));
-        iterationRef.current += 1;
-        timeRef.current += 0.5;
-      }, 500);
+      const handleOutputs = (payload) => {
+        if (payload) {
+          setLiveData(prev => ({
+            temperature: payload.temperature !== undefined ? payload.temperature : prev.temperature,
+            power: payload.power !== undefined ? payload.power : prev.power,
+            pressure: payload.pressure !== undefined ? payload.pressure : prev.pressure,
+            velocity: payload.velocity !== undefined ? payload.velocity : prev.velocity,
+            humidity: payload.humidity !== undefined ? payload.humidity : prev.humidity,
+          }));
+          if (payload.iteration !== undefined) iterationRef.current = payload.iteration;
+          if (payload.time !== undefined) timeRef.current = payload.time;
+        }
+      };
+
+      kitClient.on('outputs', handleOutputs);
+
+      return () => {
+        kitClient.off('outputs', handleOutputs);
+      };
+    }, []);
+
+    // Polling or mock data updates
+    useEffect(() => {
+      let interval;
+
+      if (kitClient.isConnected) {
+        setUseBackend(true);
+        
+        // Poll outputs.get every 500ms
+        interval = setInterval(async () => {
+          try {
+            const outputs = await kitClient.getOutputs();
+            if (outputs) {
+              setLiveData(prev => ({
+                temperature: outputs.temperature !== undefined ? outputs.temperature : prev.temperature,
+                power: outputs.power !== undefined ? outputs.power : prev.power,
+                pressure: outputs.pressure !== undefined ? outputs.pressure : prev.pressure,
+                velocity: outputs.velocity !== undefined ? outputs.velocity : prev.velocity,
+                humidity: outputs.humidity !== undefined ? outputs.humidity : prev.humidity,
+              }));
+              if (outputs.iteration !== undefined) iterationRef.current = outputs.iteration;
+              if (outputs.time !== undefined) timeRef.current = outputs.time;
+            }
+          } catch (err) {
+            console.error('Failed to get outputs:', err);
+          }
+        }, 500);
+      } else {
+        setUseBackend(false);
+        
+        // Simulate live data updates every 500ms (local mode)
+        interval = setInterval(() => {
+          setLiveData((prev) => ({
+            temperature: Math.max(20, Math.min(90, prev.temperature + (Math.random() - 0.5) * 2)),
+            power: Math.max(0, Math.min(200, prev.power + (Math.random() - 0.5) * 3)),
+            pressure: Math.max(0.8, Math.min(2.8, prev.pressure + (Math.random() - 0.5) * 0.1)),
+            velocity: Math.max(0, Math.min(6, prev.velocity + (Math.random() - 0.5) * 0.3)),
+            humidity: Math.max(0, Math.min(100, prev.humidity + (Math.random() - 0.5) * 1.5)),
+          }));
+          iterationRef.current += 1;
+          timeRef.current += 0.5;
+        }, 500);
+      }
 
       return () => clearInterval(interval);
-    }, []);
+    }, [kitClient.isConnected]);
 
     // Expose API to parent via ref
     useImperativeHandle(ref, () => ({
