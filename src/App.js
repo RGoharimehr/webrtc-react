@@ -227,7 +227,6 @@ function App() {
       } catch (e) {
         console.warn("Cleanup error (Kit API):", e);
       }
-      }
     };
   }, []);
 
