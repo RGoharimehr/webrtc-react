@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import kitClient from '../api/kitClient';
 
 const Configuration = () => {
   const [config, setConfig] = useState({
@@ -11,7 +12,85 @@ const Configuration = () => {
 
   const [logs, setLogs] = useState('Configuration panel ready.\n');
   const [isExpanded, setIsExpanded] = useState(true);
+  const [useBackend, setUseBackend] = useState(false);
   const timerRef = useRef(null);
+
+  // Fetch config from backend on mount and connection changes
+  useEffect(() => {
+    const updateBackendStatus = async () => {
+      if (kitClient.isConnected) {
+        setUseBackend(true);
+        setConfig(prev => ({ ...prev, status: 'Connected' }));
+        await fetchConfigFromBackend();
+        await fetchStatusFromBackend();
+      } else {
+        setUseBackend(false);
+        setConfig(prev => ({ ...prev, status: 'Not Connected' }));
+      }
+    };
+
+    updateBackendStatus();
+
+    const onConnected = () => updateBackendStatus();
+    const onDisconnected = () => {
+      setUseBackend(false);
+      setConfig(prev => ({ ...prev, status: 'Not Connected' }));
+      addLog('Backend disconnected');
+    };
+
+    kitClient.on('connected', onConnected);
+    kitClient.on('disconnected', onDisconnected);
+
+    return () => {
+      kitClient.off('connected', onConnected);
+      kitClient.off('disconnected', onDisconnected);
+    };
+  }, []);
+
+  const fetchConfigFromBackend = async () => {
+    try {
+      const backendConfig = await kitClient.getConfig();
+      if (backendConfig) {
+        setConfig(prev => ({
+          ...prev,
+          projectFile: backendConfig.projectFile || prev.projectFile,
+          ioDirectory: backendConfig.ioDirectory || prev.ioDirectory,
+          solveOnChange: backendConfig.solveOnChange !== undefined ? backendConfig.solveOnChange : prev.solveOnChange,
+          dataInterval: backendConfig.dataInterval || prev.dataInterval
+        }));
+        addLog('✅ Configuration loaded from backend');
+      }
+    } catch (err) {
+      addLog(`❌ Failed to fetch config: ${err.message}`);
+      console.error('Failed to fetch config:', err);
+    }
+  };
+
+  const fetchStatusFromBackend = async () => {
+    try {
+      const status = await kitClient.getStatus();
+      if (status) {
+        addLog(`Backend status: ${status.state || 'unknown'}`);
+      }
+    } catch (err) {
+      addLog(`❌ Failed to fetch status: ${err.message}`);
+      console.error('Failed to fetch status:', err);
+    }
+  };
+
+  const handleConfigChange = async (field, value) => {
+    setConfig(prev => ({ ...prev, [field]: value }));
+
+    if (useBackend) {
+      try {
+        await kitClient.setConfig({ [field]: value });
+        addLog(`✅ ${field} updated on backend`);
+      } catch (err) {
+        addLog(`❌ Failed to update ${field}: ${err.message}`);
+        console.error('Failed to update config:', err);
+      }
+    }
+  };
 
   const addLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -87,7 +166,7 @@ const Configuration = () => {
                 <input
                   type="text"
                   value={config.projectFile}
-                  onChange={(e) => setConfig({...config, projectFile: e.target.value})}
+                  onChange={(e) => handleConfigChange('projectFile', e.target.value)}
                   placeholder="Select project file..."
                   style={{ flex: 1 }}
                 />
@@ -101,7 +180,7 @@ const Configuration = () => {
                 <input
                   type="text"
                   value={config.ioDirectory}
-                  onChange={(e) => setConfig({...config, ioDirectory: e.target.value})}
+                  onChange={(e) => handleConfigChange('ioDirectory', e.target.value)}
                   placeholder="Select directory..."
                   style={{ flex: 1 }}
                 />
@@ -114,7 +193,7 @@ const Configuration = () => {
                 <input
                   type="checkbox"
                   checked={config.solveOnChange}
-                  onChange={(e) => setConfig({...config, solveOnChange: e.target.checked})}
+                  onChange={(e) => handleConfigChange('solveOnChange', e.target.checked)}
                 />
                 <span>Solve on Input Change</span>
               </label>
@@ -129,7 +208,7 @@ const Configuration = () => {
                   max="1.5"
                   step="0.25"
                   value={config.dataInterval}
-                  onChange={(e) => setConfig({...config, dataInterval: parseFloat(e.target.value)})}
+                  onChange={(e) => handleConfigChange('dataInterval', parseFloat(e.target.value))}
                 />
                 <span className="value-display">{config.dataInterval} s</span>
               </div>

@@ -1,9 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
+import kitClient from '../api/kitClient';
 
 const ResultsMapping = () => {
   const [targetPath, setTargetPath] = useState('/World');
   const [logs, setLogs] = useState('Results mapping ready.\n');
+  const [useBackend, setUseBackend] = useState(false);
   const timerRef = useRef(null);
+
+  useEffect(() => {
+    setUseBackend(kitClient.isConnected);
+
+    const onConnected = () => setUseBackend(true);
+    const onDisconnected = () => setUseBackend(false);
+
+    kitClient.on('connected', onConnected);
+    kitClient.on('disconnected', onDisconnected);
+
+    return () => {
+      kitClient.off('connected', onConnected);
+      kitClient.off('disconnected', onDisconnected);
+    };
+  }, []);
 
   const addLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -17,23 +34,71 @@ const ResultsMapping = () => {
     });
   };
 
-  const startPropertyOverride = () => {
+  const startPropertyOverride = async () => {
     addLog(`Starting prim property override for path: ${targetPath}`);
+
+    if (useBackend) {
+      try {
+        await kitClient.applyMapping();
+        addLog('✅ Mapping applied on backend');
+      } catch (err) {
+        addLog(`❌ Failed to apply mapping: ${err.message}`);
+        console.error('Failed to apply mapping:', err);
+      }
+    }
   };
 
-  const generateMappingConfig = () => {
+  const generateMappingConfig = async () => {
     addLog('Generating mapping configuration file...');
-    timerRef.current = setTimeout(() => {
-      addLog('Mapping config file generated successfully');
-    }, 500);
+    
+    if (useBackend) {
+      try {
+        await kitClient.applyMapping();
+        addLog('✅ Mapping config generated on backend');
+      } catch (err) {
+        addLog(`❌ Failed to generate mapping config: ${err.message}`);
+        console.error('Failed to generate mapping config:', err);
+      }
+    } else {
+      timerRef.current = setTimeout(() => {
+        addLog('Mapping config file generated successfully (local mode)');
+      }, 500);
+    }
   };
 
-  const importProject = () => {
+  const importProject = async () => {
     addLog('Opening import dialog...');
+    
+    if (useBackend) {
+      // In a real scenario, this would show a file picker and send the path
+      const filePath = prompt('Enter project ZIP file path:');
+      if (filePath) {
+        try {
+          await kitClient.importZip(filePath);
+          addLog(`✅ Project imported from ${filePath}`);
+        } catch (err) {
+          addLog(`❌ Failed to import project: ${err.message}`);
+          console.error('Failed to import project:', err);
+        }
+      }
+    }
   };
 
-  const exportProject = () => {
+  const exportProject = async () => {
     addLog('Opening export dialog...');
+    
+    if (useBackend) {
+      try {
+        const result = await kitClient.exportZip();
+        if (result.filePath) {
+          addLog(`✅ Project exported to ${result.filePath}`);
+          alert(`Project exported to:\n${result.filePath}`);
+        }
+      } catch (err) {
+        addLog(`❌ Failed to export project: ${err.message}`);
+        console.error('Failed to export project:', err);
+      }
+    }
   };
 
   // Cleanup timers on unmount
