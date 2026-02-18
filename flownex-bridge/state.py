@@ -112,7 +112,10 @@ class BridgeState:
                 self.outputs[key] = 0.0  # Initialize with default
 
     def set_input(self, scope: str, key: str, value: Any) -> tuple[str, str, Any]:
-        """Set an input value and return (scope, key, value) tuple"""
+        """
+        Set an input value and return (scope, key, value) tuple.
+        The tuple is used by server.py to echo the change back to WebSocket clients.
+        """
         if scope not in self.inputs:
             self.inputs[scope] = {}
         self.inputs[scope][key] = value

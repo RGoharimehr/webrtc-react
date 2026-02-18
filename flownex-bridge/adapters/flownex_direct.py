@@ -67,16 +67,13 @@ class FlownexDirectAdapter:
 
     def set_property(self, component_identifier: str, property_identifier: str, value: Any) -> None:
         """Set a property value in Flownex"""
-        if not self._opened:
-            # In stub mode, silently accept
-            if not PYTHONNET_OK:
-                return
-            # In real mode, raise error
-            raise RuntimeError("Project not opened yet")
-
+        # In stub mode, always accept without error
         if not PYTHONNET_OK:
-            # STUB: accept
             return
+
+        # In real mode, require project to be opened
+        if not self._opened:
+            raise RuntimeError("Project not opened yet")
 
         # TODO: REAL IMPLEMENTATION
         # self._api.set_value(component_identifier, property_identifier, value)
@@ -84,14 +81,13 @@ class FlownexDirectAdapter:
 
     def solve_steady(self) -> None:
         """Run a steady-state solve"""
-        if not self._opened:
-            if not PYTHONNET_OK:
-                return  # Stub mode: silently accept
-            raise RuntimeError("Project not opened yet")
-
+        # In stub mode, always succeed
         if not PYTHONNET_OK:
-            # STUB: do nothing
             return
+
+        # In real mode, require project to be opened
+        if not self._opened:
+            raise RuntimeError("Project not opened yet")
 
         # TODO: REAL IMPLEMENTATION
         # self._api.solve()
@@ -103,18 +99,13 @@ class FlownexDirectAdapter:
         outputs_def is a dict of key -> OutputDef objects
         Returns: dict of key -> value
         """
-        if not self._opened:
-            if not PYTHONNET_OK:
-                # Stub mode: return dummy values
-                return {k: 0.0 for k in outputs_def.keys()}
-            raise RuntimeError("Project not opened yet")
-
+        # In stub mode, return dummy values
         if not PYTHONNET_OK:
-            # STUB: return dummy values so graphs/plots can work
-            out = {}
-            for k in outputs_def.keys():
-                out[k] = 0.0
-            return out
+            return {k: 0.0 for k in outputs_def.keys()}
+
+        # In real mode, require project to be opened
+        if not self._opened:
+            raise RuntimeError("Project not opened yet")
 
         # TODO: REAL IMPLEMENTATION
         # out = {}
