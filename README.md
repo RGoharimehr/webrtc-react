@@ -55,12 +55,33 @@ The application will open at `http://localhost:3000`
 
 ## Omniverse Streaming (REAL - Not Stub)
 
-This application uses the **REAL** NVIDIA Omniverse WebRTC Streaming Library.
+This application uses the **REAL** NVIDIA Omniverse WebRTC Streaming Library and supports all three official deployment modes.
 
 **Important:** Omniverse streaming and Flownex backend are **separate systems**.
 
 - **Omniverse:** Frontend WebRTC video streaming (REAL library)
 - **Flownex:** Backend Python API bridge (can be stub or real, independent)
+
+### Three Streaming Modes
+
+The AppStream component supports all three NVIDIA-recommended deployment modes:
+
+1. **Local (DIRECT)** - Default mode for development
+   - Connect directly to Kit running on your machine
+   - Uses localhost:49100 by default
+   - Perfect for development and testing
+
+2. **Stream (OKAS)** - Omniverse Kit Application Streaming
+   - On-demand cloud streaming
+   - Enterprise managed deployment
+   - Requires session management
+
+3. **GFN (Graphics Delivery Network)** - Enterprise streaming
+   - NVIDIA GeForce NOW infrastructure
+   - Requires GFN credentials
+   - Full SDK integration
+
+**See:** [APPSTREAM_IMPLEMENTATION.md](APPSTREAM_IMPLEMENTATION.md) for complete guide
 
 ### Setup for Omniverse Streaming
 
@@ -71,12 +92,14 @@ This application uses the **REAL** NVIDIA Omniverse WebRTC Streaming Library.
    ```
 
 2. **Configure streaming:**
-   Edit `stream.config.json` with your Omniverse Kit server address
+   Edit `stream.config.json` to select your mode:
    
-   **Streaming Modes:**
-   - **Local** (default): Connect to Kit on your machine or network
-   - **Stream (OKAS)**: On-demand cloud streaming
-   - **GFN**: Graphics Delivery Network streaming
+   ```json
+   {
+     "source": "local",  // or "stream" or "gfn"
+     "local": { "server": "127.0.0.1", "signalingPort": 49100 }
+   }
+   ```
    
    See [STREAM_CONFIGURATION.md](STREAM_CONFIGURATION.md) for detailed configuration options.
 
