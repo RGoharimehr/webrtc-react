@@ -24,3 +24,5 @@ yarn-error.log*
 
 # package lock files (optional - uncomment if needed)
 # package-lock.json
+__pycache__/
+*.pyc
