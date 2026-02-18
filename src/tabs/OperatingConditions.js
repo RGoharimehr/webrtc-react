@@ -1,13 +1,13 @@
 import React, { useMemo, useState, useEffect } from "react";
 
 const OperatingConditions = ({ bridge }) => {
-  const inputs = bridge?.schema?.inputs || [];
   const dynamicValues = bridge?.state?.inputs?.dynamic || {};
 
   // Only show the Heat Rejection / Rack Power Script sliders in this tab (you can change filter)
   const shown = useMemo(() => {
+    const inputs = bridge?.schema?.inputs || [];
     return inputs.filter((i) => i.editType === "slider");
-  }, [inputs]);
+  }, [bridge?.schema?.inputs]);
 
   // Local UI fallback for when bridge isn't ready yet
   const [local, setLocal] = useState({});

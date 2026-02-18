@@ -1,57 +1,115 @@
 # flownex-bridge/adapters/flownex_direct.py
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
+
+# If pythonnet isn't installed yet, we run in stub mode
+try:
+    import clr  # noqa
+    PYTHONNET_OK = True
+except Exception:
+    PYTHONNET_OK = False
 
 
-class FlownexNotAvailable(RuntimeError):
-    pass
-
-
-@dataclass
 class FlownexDirectAdapter:
     """
     Direct adapter to Flownex via pythonnet (.NET).
     This file is SAFE to import even when pythonnet/Flownex is not installed.
-    Actual .NET imports happen only inside connect().
+    In stub mode (when pythonnet is not available), it simulates the API.
     """
-    connected: bool = False
-    last_error: Optional[str] = None
 
-    # you can store .NET handles here later
-    _fnx: Any = None
+    def __init__(self):
+        self._opened = False
+        self._project_path = None
+        # Put your real API object here when you wire it
+        self._api = None
 
-    def connect(self, *args, **kwargs) -> None:
-        """
-        Attempt to load pythonnet (clr) and connect to Flownex.
-        Raises FlownexNotAvailable if pythonnet isn't available.
-        """
-        try:
-            import clr  # noqa: F401  (pythonnet)
-        except Exception as e:
-            self.connected = False
-            self.last_error = f"pythonnet (clr) not available: {e}"
-            raise FlownexNotAvailable(self.last_error)
+    def open_project(self, project_path: str) -> None:
+        """Open a Flownex project"""
+        if not project_path:
+            raise ValueError("project_path is empty")
 
-        # TODO: later: load Flownex assemblies, open project, bind I/O
-        self.connected = True
-        self.last_error = None
+        self._project_path = project_path
 
-    def set_input(self, scope: str, key: str, value: Any) -> None:
-        if not self.connected:
-            raise FlownexNotAvailable(self.last_error or "Flownex not connected")
+        if not PYTHONNET_OK:
+            # STUB: behave as if it opened
+            self._opened = True
+            return
 
-        # TODO: write mapped value to Flownex input
-        # self._fnx.SetValue(...)
+        # TODO: REAL IMPLEMENTATION
+        # Example: create Flownex application instance, open project, etc.
+        # self._api = YourFlownexApi(...)
+        # self._api.open_project(project_path)
+        self._opened = True
+
+    def close_project(self) -> None:
+        """Close the current project"""
+        if not self._opened:
+            return
+
+        if PYTHONNET_OK and self._api is not None:
+            # TODO: REAL IMPLEMENTATION
+            # self._api.close_project()
+            pass
+
+        self._opened = False
+
+    def close_flownex(self) -> None:
+        """Close the Flownex application"""
+        # In real mode, quit the Flownex application.
+        if PYTHONNET_OK and self._api is not None:
+            # TODO: REAL IMPLEMENTATION
+            # self._api.quit()
+            pass
+
+        self._api = None
+        self._opened = False
+        self._project_path = None
+
+    def set_property(self, component_identifier: str, property_identifier: str, value: Any) -> None:
+        """Set a property value in Flownex"""
+        # In stub mode, always accept without error
+        if not PYTHONNET_OK:
+            return
+
+        # In real mode, require project to be opened
+        if not self._opened:
+            raise RuntimeError("Project not opened yet")
+
+        # TODO: REAL IMPLEMENTATION
+        # self._api.set_value(component_identifier, property_identifier, value)
         return
 
-    def run_steady(self) -> Dict[str, Any]:
-        if not self.connected:
-            raise FlownexNotAvailable(self.last_error or "Flownex not connected")
+    def solve_steady(self) -> None:
+        """Run a steady-state solve"""
+        # In stub mode, always succeed
+        if not PYTHONNET_OK:
+            return
 
-        # TODO: run Flownex steady solve and return outputs
-        return {"ok": True, "message": "Steady solve placeholder"}
+        # In real mode, require project to be opened
+        if not self._opened:
+            raise RuntimeError("Project not opened yet")
 
-    def disconnect(self) -> None:
-        self.connected = False
-        self._fnx = None
+        # TODO: REAL IMPLEMENTATION
+        # self._api.solve()
+        return
+
+    def read_outputs(self, outputs_def: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Read output values from Flownex.
+        outputs_def is a dict of key -> OutputDef objects
+        Returns: dict of key -> value
+        """
+        # In stub mode, return dummy values
+        if not PYTHONNET_OK:
+            return {k: 0.0 for k in outputs_def.keys()}
+
+        # In real mode, require project to be opened
+        if not self._opened:
+            raise RuntimeError("Project not opened yet")
+
+        # TODO: REAL IMPLEMENTATION
+        # out = {}
+        # for k, odef in outputs_def.items():
+        #     out[k] = self._api.get_value(odef.componentIdentifier, odef.propertyIdentifier)
+        # return out
+        return {k: 0.0 for k in outputs_def.keys()}
