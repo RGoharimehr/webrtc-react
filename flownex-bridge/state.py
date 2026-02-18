@@ -1,171 +1,213 @@
 # flownex-bridge/state.py
 from __future__ import annotations
 
+from dataclasses import dataclass, asdict
+from typing import Any, Dict, Optional, Tuple
 import csv
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+import os
+import re
+import time
 
+
+# ======================
+# helpers
+# ======================
+
+def _to_float(x, default=None):
+    try:
+        return float(x)
+    except (ValueError, TypeError):
+        return default
+
+
+def _to_int(x, default=None):
+    try:
+        return int(float(x))
+    except (ValueError, TypeError):
+        return default
+
+
+def sanitize_key(key: str) -> str:
+    """
+    Normalize keys so JS + Python dictionaries are safe.
+    Example:
+      "Fan Speed" -> "Fan_Speed"
+    """
+    key = (key or "").strip()
+    key = re.sub(r"\s+", "_", key)
+    return key
+
+
+# ======================
+# schema definitions
+# ======================
 
 @dataclass
 class InputDef:
-    """Definition for an input parameter"""
     key: str
     rawKey: str
     description: str
-    unit: str
     componentIdentifier: str
     propertyIdentifier: str
-    editType: str  # e.g., "slider", "text", etc.
-    defaultValue: float = 0.0
-    min: Optional[float] = None
-    max: Optional[float] = None
-    step: Optional[float] = None
+    editType: str
+    min: Optional[float]
+    max: Optional[float]
+    step: Optional[float]
+    unit: str
+    defaultValue: Optional[float]
 
 
 @dataclass
 class OutputDef:
-    """Definition for an output parameter"""
     key: str
     rawKey: str
     description: str
-    unit: str
     componentIdentifier: str
     propertyIdentifier: str
+    category: str
+    unit: str
 
+
+# ======================
+# main bridge state
+# ======================
 
 class BridgeState:
-    """
-    Maintains the state of inputs, outputs, and configuration for the bridge.
-    """
-
     def __init__(self):
+        # Project
         self.connected_project: Optional[str] = None
-        
-        # Schema definitions
+
+        # Schema
         self.inputs_def: Dict[str, InputDef] = {}
         self.outputs_def: Dict[str, OutputDef] = {}
-        
-        # Current state values
+
+        # Runtime values
         self.inputs: Dict[str, Dict[str, Any]] = {
             "dynamic": {},
             "static": {},
         }
         self.outputs: Dict[str, Any] = {}
-        
+
         # Status
         self.status: Dict[str, Any] = {
             "state": "idle",
-            "message": "Ready",
+            "message": "ready",
             "progress": 0.0,
         }
 
+        self._boot_ts = time.time()
+
+    # ======================
+    # schema loading
+    # ======================
+
     def load_schema_from_csv(self, inputs_csv: str, outputs_csv: str) -> None:
-        """Load input and output definitions from CSV files"""
-        # Load inputs
-        self.inputs_def = {}
-        with open(inputs_csv, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                key = row.get('Key', '').strip()
-                if not key:
-                    continue
-                    
-                input_def = InputDef(
-                    key=key,
-                    rawKey=row.get('Raw Key', key),
-                    description=row.get('Description', ''),
-                    unit=row.get('Unit', ''),
-                    componentIdentifier=row.get('Component Identifier', ''),
-                    propertyIdentifier=row.get('Property Identifier', ''),
-                    editType=row.get('Edit Type', 'slider'),
-                    defaultValue=float(row.get('Default', 0)),
-                    min=float(row['Min']) if row.get('Min') else None,
-                    max=float(row['Max']) if row.get('Max') else None,
-                    step=float(row['Step']) if row.get('Step') else None,
-                )
-                self.inputs_def[key] = input_def
-                
-                # Initialize input values with defaults
-                scope = row.get('Scope', 'dynamic').lower()
-                if scope not in self.inputs:
-                    self.inputs[scope] = {}
-                self.inputs[scope][key] = input_def.defaultValue
+        if not os.path.isfile(inputs_csv):
+            raise FileNotFoundError(inputs_csv)
 
-        # Load outputs
-        self.outputs_def = {}
-        with open(outputs_csv, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                key = row.get('Key', '').strip()
-                if not key:
-                    continue
-                    
-                output_def = OutputDef(
-                    key=key,
-                    rawKey=row.get('Raw Key', key),
-                    description=row.get('Description', ''),
-                    unit=row.get('Unit', ''),
-                    componentIdentifier=row.get('Component Identifier', ''),
-                    propertyIdentifier=row.get('Property Identifier', ''),
-                )
-                self.outputs_def[key] = output_def
-                self.outputs[key] = 0.0  # Initialize with default
+        if not os.path.isfile(outputs_csv):
+            raise FileNotFoundError(outputs_csv)
 
-    def set_input(self, scope: str, key: str, value: Any) -> tuple[str, str, Any]:
-        """
-        Set an input value and return (scope, key, value) tuple.
-        The tuple is used by server.py to echo the change back to WebSocket clients.
-        """
-        if scope not in self.inputs:
-            self.inputs[scope] = {}
-        self.inputs[scope][key] = value
-        return (scope, key, value)
+        self.inputs_def = self._load_inputs(inputs_csv)
+        self.outputs_def = self._load_outputs(outputs_csv)
 
-    def set_output(self, key: str, value: Any) -> None:
-        """Set an output value"""
-        self.outputs[key] = value
-
-    def state_dict(self) -> Dict[str, Any]:
-        """Return current state as a dictionary"""
-        return {
-            "inputs": self.inputs,
-            "outputs": self.outputs,
-        }
+        # preload defaults into dynamic inputs
+        self.inputs["dynamic"].clear()
+        for k, idef in self.inputs_def.items():
+            if idef.defaultValue is not None:
+                self.inputs["dynamic"][k] = idef.defaultValue
 
     def schema_dict(self) -> Dict[str, Any]:
-        """Return schema definitions as a dictionary"""
-        inputs_schema = []
-        for input_def in self.inputs_def.values():
-            inputs_schema.append({
-                "key": input_def.key,
-                "rawKey": input_def.rawKey,
-                "description": input_def.description,
-                "unit": input_def.unit,
-                "componentIdentifier": input_def.componentIdentifier,
-                "propertyIdentifier": input_def.propertyIdentifier,
-                "editType": input_def.editType,
-                "defaultValue": input_def.defaultValue,
-                "min": input_def.min,
-                "max": input_def.max,
-                "step": input_def.step,
-            })
-
-        outputs_schema = []
-        for output_def in self.outputs_def.values():
-            outputs_schema.append({
-                "key": output_def.key,
-                "rawKey": output_def.rawKey,
-                "description": output_def.description,
-                "unit": output_def.unit,
-                "componentIdentifier": output_def.componentIdentifier,
-                "propertyIdentifier": output_def.propertyIdentifier,
-            })
-
         return {
-            "inputs": inputs_schema,
-            "outputs": outputs_schema,
+            "inputs": [asdict(v) for v in self.inputs_def.values()],
+            "outputs": [asdict(v) for v in self.outputs_def.values()],
         }
 
+    # ======================
+    # state serialization
+    # ======================
+
     def status_dict(self) -> Dict[str, Any]:
-        """Return current status as a dictionary"""
-        return self.status
+        return dict(self.status)
+
+    def state_dict(self) -> Dict[str, Any]:
+        return {
+            "connected_project": self.connected_project,
+            "inputs": self.inputs,
+            "outputs": self.outputs,
+            "status": self.status_dict(),
+            "uptime_s": round(time.time() - self._boot_ts, 2),
+        }
+
+    # ======================
+    # runtime updates
+    # ======================
+
+    def set_input(self, scope: str, key: str, value: Any) -> Tuple[str, str, Any]:
+        if scope not in ("dynamic", "static"):
+            raise ValueError(f"Invalid scope: {scope}. Must be 'dynamic' or 'static'")
+        
+        k = sanitize_key(key)
+
+        if k not in self.inputs_def:
+            raise KeyError(f"Unknown input key: '{key}' (sanitized: '{k}')")
+
+        self.inputs[scope][k] = value
+        return scope, k, value
+
+    def set_output(self, key: str, value: Any) -> Tuple[str, Any]:
+        k = sanitize_key(key)
+        self.outputs[k] = value
+        return k, value
+
+    # ======================
+    # CSV loaders
+    # ======================
+
+    def _load_inputs(self, path: str) -> Dict[str, InputDef]:
+        out: Dict[str, InputDef] = {}
+
+        with open(path, "r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+
+            for row in reader:
+                raw_key = (row.get("Key") or "").strip()
+                key = sanitize_key(raw_key)
+
+                out[key] = InputDef(
+                    key=key,
+                    rawKey=raw_key,
+                    description=(row.get("Description") or "").strip(),
+                    componentIdentifier=(row.get("ComponentIdentifier") or "").strip(),
+                    propertyIdentifier=(row.get("PropertyIdentifier") or "").strip(),
+                    editType=(row.get("EditType") or "").strip().lower(),
+                    min=_to_float(row.get("Min")),
+                    max=_to_float(row.get("Max")),
+                    step=_to_float(row.get("Step")),
+                    unit=(row.get("Unit") or "").strip(),
+                    defaultValue=_to_float(row.get("DefaultValue")),
+                )
+
+        return out
+
+    def _load_outputs(self, path: str) -> Dict[str, OutputDef]:
+        out: Dict[str, OutputDef] = {}
+
+        with open(path, "r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+
+            for row in reader:
+                raw_key = (row.get("Key") or "").strip()
+                key = sanitize_key(raw_key)
+
+                out[key] = OutputDef(
+                    key=key,
+                    rawKey=raw_key,
+                    description=(row.get("Description") or "").strip(),
+                    componentIdentifier=(row.get("ComponentIdentifier") or "").strip(),
+                    propertyIdentifier=(row.get("PropertyIdentifier") or "").strip(),
+                    category=(row.get("Category") or "").strip(),
+                    unit=(row.get("Unit") or "").strip(),
+                )
+
+        return out
