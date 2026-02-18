@@ -131,8 +131,8 @@ export default function App() {
 
   // Legend state
   const [legendOpen, setLegendOpen] = useState(false);
-  const [legendVar, setLegendVar] = useState("temperature");
-  const [legendPreset, setLegendPreset] = useState("turbo");
+  const legendVar = "temperature";
+  const legendPreset = "turbo";
 
   const legendVarObj =
     LEGEND_VARIABLES.find((v) => v.id === legendVar) || LEGEND_VARIABLES[0];
