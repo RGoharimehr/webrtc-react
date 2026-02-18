@@ -1,8 +1,8 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import StreamConfig from '../stream.config.json';
-// Use stub by default - can be replaced when real library is installed
-import { AppStreamer } from '../lib/omniverse-webrtc-stub';
+// Using real NVIDIA Omniverse WebRTC Streaming Library
+import { AppStreamer, StreamType } from '@nvidia/omniverse-webrtc-streaming-library';
 
 class AppStream extends Component {
     constructor(props) {
@@ -22,7 +22,7 @@ class AppStream extends Component {
             let streamSource;
 
             if (StreamConfig.source === 'local') {
-                streamSource = 'DIRECT';
+                streamSource = StreamType.DIRECT;
                 streamConfig = {
                     videoElementId: 'remote-video',
                     audioElementId: 'remote-audio',
@@ -197,13 +197,6 @@ class AppStream extends Component {
                         }}></div>
                     </div>
                     <div>Connecting to Omniverse stream...</div>
-                    <div style={{ 
-                        fontSize: '14px', 
-                        color: '#aaa', 
-                        marginTop: '10px' 
-                    }}>
-                        Using stub library - install NVIDIA library for real streaming
-                    </div>
                 </div>
                 
                 {/* Add CSS animation for spinner */}
@@ -213,40 +206,6 @@ class AppStream extends Component {
                         100% { transform: rotate(360deg); }
                     }
                 `}</style>
-                
-                {/* Placeholder content when stream is ready (stub mode) */}
-                {this.state.streamReady && (
-                    <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-                        color: 'white'
-                    }}>
-                        <div style={{ textAlign: 'center', padding: '40px' }}>
-                            <div style={{ fontSize: '48px', marginBottom: '20px' }}>🎥</div>
-                            <h2 style={{ marginBottom: '15px' }}>Omniverse Stream Connected (Stub Mode)</h2>
-                            <p style={{ color: '#aaa', marginBottom: '10px' }}>
-                                Video feed would appear here with real NVIDIA streaming library
-                            </p>
-                            <div style={{
-                                display: 'inline-block',
-                                padding: '8px 16px',
-                                background: 'rgba(76, 175, 80, 0.3)',
-                                border: '1px solid #4CAF50',
-                                borderRadius: '4px',
-                                marginTop: '15px'
-                            }}>
-                                ✓ Stream Active
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         );
     }
