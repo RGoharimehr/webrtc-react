@@ -2,10 +2,6 @@
   "name": "webrtc-react",
   "version": "0.1.0",
   "private": true,
-  "engines": {
-    "node": "^18.0.0",
-    "npm": "^10.0.0"
-  },
   "dependencies": {
     "@nvidia/omniverse-webrtc-streaming-library": "file:./exapmle/omniverse-webrtc-streaming-library",
     "prop-types": "^15.8.1",

@@ -4,21 +4,8 @@ A modern React application for data center monitoring with WebRTC screen sharing
 
 ## Prerequisites
 
-**Required:**
-- **Node.js 18.0.0 or higher** (current: 18.x, 20.x, or 22.x recommended)
-- **npm 10.0.0 or higher**
-
-**Check your versions:**
-```bash
-node --version  # Should show v18.x.x or higher
-npm --version   # Should show 10.x.x or higher
-```
-
-**If you need to upgrade:**
-- Download from [nodejs.org](https://nodejs.org/)
-- Use [nvm](https://github.com/nvm-sh/nvm) (recommended): `nvm install 18`
-
-**Note:** The NVIDIA Omniverse WebRTC Streaming Library requires Node.js 18+ for proper WebRTC support.
+- Node.js 14 or higher
+- npm (comes with Node.js)
 
 ## Installation
 
@@ -71,13 +58,6 @@ This application uses the **REAL** NVIDIA Omniverse WebRTC Streaming Library.
 
 2. **Configure streaming:**
    Edit `stream.config.json` with your Omniverse Kit server address
-   
-   **Streaming Modes:**
-   - **Local** (default): Connect to Kit on your machine or network
-   - **Stream (OKAS)**: On-demand cloud streaming
-   - **GFN**: Graphics Delivery Network streaming
-   
-   See [STREAM_CONFIGURATION.md](STREAM_CONFIGURATION.md) for detailed configuration options.
 
 3. **Start Omniverse Kit:**
    - Launch Omniverse Kit application
