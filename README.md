@@ -38,6 +38,33 @@ The application will open at `http://localhost:3000`
 - **`npm test`** - Launch the test runner
 - **`npm run build`** - Build the app for production
 - **`npm run verify`** - Verify setup and diagnose issues
+- **`npm run check-stub`** - Check why application is in stub mode
+
+## Understanding Stub Mode
+
+This application can run in **stub mode** for development without external dependencies. If you see messages about "stub mode", this is normal and intentional.
+
+**Quick Check:**
+```bash
+npm run check-stub
+```
+
+This will show you:
+- ✅ What's working
+- ❌ What's in stub mode
+- 📝 How to exit stub mode (if desired)
+
+**For detailed information**, see:
+- [WHY_STUB_MODE.md](WHY_STUB_MODE.md) - Complete explanation
+- [OMNIVERSE_STREAMING.md](OMNIVERSE_STREAMING.md) - Omniverse setup
+- [BRIDGE_SERVER_FIX.md](BRIDGE_SERVER_FIX.md) - Backend details
+
+**TL;DR:** Stub mode lets you develop without:
+- NVIDIA Omniverse Kit running
+- Flownex software installed  
+- External streaming services
+
+It's **perfect for development** and testing UI/workflows!
 
 ## Troubleshooting
 
