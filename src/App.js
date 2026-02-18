@@ -155,25 +155,9 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMode]);
 
-  // Attach stream to video
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = screenStream || null;
-  }, [screenStream]);
-
-  // Keep ref in sync with screenStream for cleanup
-  useEffect(() => {
-    screenStreamRef.current = screenStream;
-  }, [screenStream]);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      try {
-        if (pcRef.current) pcRef.current.close();
-        if (wsRef.current) wsRef.current.close();
-      } catch (e) {
-        console.warn("Cleanup error (WebRTC):", e);
-      }
       try {
         if (screenStreamRef.current) {
           screenStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -181,16 +165,28 @@ export default function App() {
       } catch (e) {
         console.warn("Cleanup error (stream):", e);
       }
+      try {
+        if (streamMode === "omniverse") {
+          AppStream.stop();
+        }
+      } catch (e) {
+        console.warn("Cleanup error (AppStream):", e);
+      }
     };
-  }, []);
+  }, [streamMode]);
 
   const stopScreenShare = () => {
     try {
-      if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
     } catch (e) {
       console.warn("Error stopping screen share:", e);
     }
-    setScreenStream(null);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    screenStreamRef.current = null;
     setIsStreaming(false);
     setStreamMode(null);
   };

@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { AppStreamer, StreamEvent } from '@nvidia/omniverse-webrtc-streaming-library';
 import StreamConfig from '../stream.config.json';
+// Use stub by default - can be replaced when real library is installed
+import { AppStreamer } from '../lib/omniverse-webrtc-stub';
 
 class AppStream extends Component {
     constructor(props) {
