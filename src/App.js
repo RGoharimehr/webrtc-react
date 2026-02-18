@@ -12,7 +12,6 @@ import CFDAnalysis from "./tabs/CFDAnalysis";
 
 import GraphsPanel from "./components/GraphsPanel";
 import DraggableResizable from "./components/DraggableResizable";
-import AppStream from "./components/AppStream";
 
 /* =========================
    Mode and Tab Configuration
@@ -89,15 +88,20 @@ export default function App() {
   // ✅ hooks must be INSIDE the component
   const bridge = useBridge();
 
+  // WebRTC refs
+  const pcRef = useRef(null);
+  const wsRef = useRef(null);
+  const videoRef = useRef(null);
+
   // Streaming state
+  const [screenStream, setScreenStream] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
 
   // Streaming mode: "omniverse" | "screen" | null
   const [streamMode, setStreamMode] = useState(null);
 
-  // Ref for screen sharing stream
+  // Ref to track current stream for cleanup
   const screenStreamRef = useRef(null);
-  const videoRef = useRef(null);
 
   // GraphsPanel API ref for data recording
   const graphsApiRef = useRef(null);
@@ -155,9 +159,25 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMode]);
 
+  // Attach stream to video
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = screenStream || null;
+  }, [screenStream]);
+
+  // Keep ref in sync with screenStream for cleanup
+  useEffect(() => {
+    screenStreamRef.current = screenStream;
+  }, [screenStream]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      try {
+        if (pcRef.current) pcRef.current.close();
+        if (wsRef.current) wsRef.current.close();
+      } catch (e) {
+        console.warn("Cleanup error (WebRTC):", e);
+      }
       try {
         if (screenStreamRef.current) {
           screenStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -165,38 +185,30 @@ export default function App() {
       } catch (e) {
         console.warn("Cleanup error (stream):", e);
       }
-      try {
-        if (streamMode === "omniverse") {
-          AppStream.stop();
-        }
-      } catch (e) {
-        console.warn("Cleanup error (AppStream):", e);
-      }
     };
-  }, [streamMode]);
+  }, []);
 
   const stopScreenShare = () => {
     try {
-      if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
+      if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
     } catch (e) {
       console.warn("Error stopping screen share:", e);
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    screenStreamRef.current = null;
+    setScreenStream(null);
     setIsStreaming(false);
     setStreamMode(null);
   };
 
   const disconnectOmniverseStream = () => {
     try {
-      AppStream.stop();
+      if (pcRef.current) pcRef.current.close();
+      if (wsRef.current) wsRef.current.close();
     } catch (e) {
       console.warn("Error disconnecting Omniverse stream:", e);
     }
+    pcRef.current = null;
+    wsRef.current = null;
+    setScreenStream(null);
     setIsStreaming(false);
     setStreamMode(null);
   };
@@ -210,10 +222,7 @@ export default function App() {
         audio: false,
       });
 
-      screenStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      setScreenStream(stream);
       setIsStreaming(true);
       setStreamMode("screen");
 
@@ -225,10 +234,87 @@ export default function App() {
     }
   };
 
-  const connectOmniverseStream = () => {
+  const connectOmniverseStream = async () => {
     stopScreenShare();
-    setIsStreaming(true);
-    setStreamMode("omniverse");
+
+    const host = process.env.REACT_APP_OV_SIGNAL_HOST || "localhost";
+    const port = process.env.REACT_APP_OV_SIGNAL_PORT || "49100";
+    const proto = process.env.REACT_APP_OV_SIGNAL_PROTO || "ws";
+
+    const wsUrl = `${proto}://${host}:${port}`;
+    console.log("Connecting to Omniverse signaling:", wsUrl);
+
+    disconnectOmniverseStream();
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    pcRef.current = pc;
+
+    pc.ontrack = (event) => {
+      const [stream] = event.streams;
+      if (stream) {
+        setScreenStream(stream);
+        setIsStreaming(true);
+        setStreamMode("omniverse");
+      }
+    };
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ candidate: e.candidate }));
+      }
+    };
+
+    ws.onopen = () => console.log("Signaling connected.");
+
+    ws.onmessage = async (evt) => {
+      let msg;
+      try {
+        msg = JSON.parse(evt.data);
+      } catch {
+        console.warn("Non-JSON signaling message:", evt.data);
+        return;
+      }
+
+      try {
+        if (msg.sdp && msg.sdp.type) {
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          ws.send(JSON.stringify({ sdp: pc.localDescription }));
+          return;
+        }
+
+        if (msg.type === "offer" && msg.sdp) {
+          await pc.setRemoteDescription(
+            new RTCSessionDescription({ type: "offer", sdp: msg.sdp })
+          );
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          ws.send(JSON.stringify({ type: "answer", sdp: pc.localDescription.sdp }));
+          return;
+        }
+
+        const cand = msg.candidate || (msg.type === "candidate" ? msg.candidate : null);
+        if (cand) {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+          return;
+        }
+      } catch (err) {
+        console.error("Error handling signaling message:", err);
+      }
+    };
+
+    ws.onerror = () => {
+      alert(`Failed to connect to Omniverse signaling: ${wsUrl}`);
+      disconnectOmniverseStream();
+    };
+
+    ws.onclose = () => disconnectOmniverseStream();
   };
 
   const tabs = MODE_TABS[activeMode];
@@ -283,20 +369,7 @@ export default function App() {
       {/* Background Stream */}
       <div className="stream-background">
         {isStreaming ? (
-          streamMode === "omniverse" ? (
-            <AppStream
-              onStarted={() => console.log("Omniverse stream started")}
-              onStreamFailed={() => {
-                console.error("Omniverse stream failed");
-                setIsStreaming(false);
-                setStreamMode(null);
-              }}
-              onLoggedIn={(userId) => console.log("Logged in:", userId)}
-              handleCustomEvent={(event) => console.log("Custom event:", event)}
-            />
-          ) : (
-            <video ref={videoRef} autoPlay playsInline muted className="stream-video" />
-          )
+          <video ref={videoRef} autoPlay playsInline muted className="stream-video" />
         ) : (
           <div className="no-stream-overlay">
             <div className="start-prompt">
