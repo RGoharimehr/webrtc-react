@@ -149,7 +149,6 @@ class AppStream extends Component {
                 id="omniverse-stream-container"
                 style={{
                     backgroundColor: this.state.streamReady ? 'transparent' : '#1a1a1a',
-                    visibility: this.state.streamReady ? 'visible' : 'hidden',
                     width: '100%',
                     height: '100%',
                     position: 'relative',
@@ -166,6 +165,7 @@ class AppStream extends Component {
                         width: '100%',
                         height: '100%',
                         objectFit: 'contain',
+                        visibility: this.state.streamReady ? 'visible' : 'hidden'
                     }}
                     tabIndex={-1}
                     playsInline
@@ -173,17 +173,78 @@ class AppStream extends Component {
                     autoPlay
                 />
                 <audio id="remote-audio" muted></audio>
-                {!this.state.streamReady && (
+                
+                {/* Connection status overlay */}
+                <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    color: 'white',
+                    fontSize: '18px',
+                    textAlign: 'center',
+                    visibility: this.state.streamReady ? 'hidden' : 'visible'
+                }}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <div className="spinner" style={{
+                            border: '4px solid rgba(255, 255, 255, 0.3)',
+                            borderTop: '4px solid white',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            animation: 'spin 1s linear infinite',
+                            margin: '0 auto 15px'
+                        }}></div>
+                    </div>
+                    <div>Connecting to Omniverse stream...</div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#aaa', 
+                        marginTop: '10px' 
+                    }}>
+                        Using stub library - install NVIDIA library for real streaming
+                    </div>
+                </div>
+                
+                {/* Add CSS animation for spinner */}
+                <style>{`
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `}</style>
+                
+                {/* Placeholder content when stream is ready (stub mode) */}
+                {this.state.streamReady && (
                     <div style={{
                         position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        color: 'white',
-                        fontSize: '18px',
-                        textAlign: 'center'
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+                        color: 'white'
                     }}>
-                        Connecting to Omniverse stream...
+                        <div style={{ textAlign: 'center', padding: '40px' }}>
+                            <div style={{ fontSize: '48px', marginBottom: '20px' }}>🎥</div>
+                            <h2 style={{ marginBottom: '15px' }}>Omniverse Stream Connected (Stub Mode)</h2>
+                            <p style={{ color: '#aaa', marginBottom: '10px' }}>
+                                Video feed would appear here with real NVIDIA streaming library
+                            </p>
+                            <div style={{
+                                display: 'inline-block',
+                                padding: '8px 16px',
+                                background: 'rgba(76, 175, 80, 0.3)',
+                                border: '1px solid #4CAF50',
+                                borderRadius: '4px',
+                                marginTop: '15px'
+                            }}>
+                                ✓ Stream Active
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
