@@ -21,7 +21,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "verify": "node verify-setup.js"
+    "verify": "node verify-setup.js",
+    "check-stub": "node check-stub-mode.js"
   },
   "eslintConfig": {
     "extends": [
