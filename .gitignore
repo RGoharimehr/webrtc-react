@@ -26,3 +26,14 @@ yarn-error.log*
 # package-lock.json
 __pycache__/
 *.pyc
+
+# Backup and temporary files
+*.bak
+*~
+*.swp
+*.tmp
+
+# IDE
+.idea/
+.vscode/
+*.iml
