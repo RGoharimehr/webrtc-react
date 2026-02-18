@@ -17,6 +17,7 @@ npm --version   # Should show 10.x.x or higher
 **If you need to upgrade:**
 - Download from [nodejs.org](https://nodejs.org/)
 - Use [nvm](https://github.com/nvm-sh/nvm) (recommended): `nvm install 18`
+- See [NODE_VERSION_REQUIREMENTS.md](NODE_VERSION_REQUIREMENTS.md) for detailed upgrade instructions
 
 **Note:** The NVIDIA Omniverse WebRTC Streaming Library requires Node.js 18+ for proper WebRTC support.
 
@@ -96,6 +97,29 @@ This application uses the **REAL** NVIDIA Omniverse WebRTC Streaming Library.
 **For detailed setup:** See [OMNIVERSE_REAL_LIBRARY.md](OMNIVERSE_REAL_LIBRARY.md)
 
 ## Troubleshooting
+
+### Node.js Version Warning (EBADENGINE)
+
+If you see:
+```
+npm warn EBADENGINE Unsupported engine
+npm warn EBADENGINE   required: { node: '^18.0.0', npm: '^10.0.0' }
+```
+
+**Solution:** Upgrade to Node.js 18 or higher
+
+**Quick fix:**
+```bash
+# Check versions
+node --version
+npm --version
+
+# Upgrade via nvm (recommended)
+nvm install 18
+nvm use 18
+```
+
+**Details:** See [NODE_VERSION_REQUIREMENTS.md](NODE_VERSION_REQUIREMENTS.md)
 
 ### Webpack Source Map Warnings
 
