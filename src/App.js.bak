@@ -197,10 +197,14 @@ export default function App() {
 
   const disconnectOmniverseStream = () => {
     try {
-      AppStream.stop();
+      if (pcRef.current) pcRef.current.close();
+      if (wsRef.current) wsRef.current.close();
     } catch (e) {
       console.warn("Error disconnecting Omniverse stream:", e);
     }
+    pcRef.current = null;
+    wsRef.current = null;
+    setScreenStream(null);
     setIsStreaming(false);
     setStreamMode(null);
   };
@@ -214,10 +218,7 @@ export default function App() {
         audio: false,
       });
 
-      screenStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      setScreenStream(stream);
       setIsStreaming(true);
       setStreamMode("screen");
 
@@ -229,10 +230,87 @@ export default function App() {
     }
   };
 
-  const connectOmniverseStream = () => {
+  const connectOmniverseStream = async () => {
     stopScreenShare();
-    setIsStreaming(true);
-    setStreamMode("omniverse");
+
+    const host = process.env.REACT_APP_OV_SIGNAL_HOST || "localhost";
+    const port = process.env.REACT_APP_OV_SIGNAL_PORT || "49100";
+    const proto = process.env.REACT_APP_OV_SIGNAL_PROTO || "ws";
+
+    const wsUrl = `${proto}://${host}:${port}`;
+    console.log("Connecting to Omniverse signaling:", wsUrl);
+
+    disconnectOmniverseStream();
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    pcRef.current = pc;
+
+    pc.ontrack = (event) => {
+      const [stream] = event.streams;
+      if (stream) {
+        setScreenStream(stream);
+        setIsStreaming(true);
+        setStreamMode("omniverse");
+      }
+    };
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ candidate: e.candidate }));
+      }
+    };
+
+    ws.onopen = () => console.log("Signaling connected.");
+
+    ws.onmessage = async (evt) => {
+      let msg;
+      try {
+        msg = JSON.parse(evt.data);
+      } catch {
+        console.warn("Non-JSON signaling message:", evt.data);
+        return;
+      }
+
+      try {
+        if (msg.sdp && msg.sdp.type) {
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          ws.send(JSON.stringify({ sdp: pc.localDescription }));
+          return;
+        }
+
+        if (msg.type === "offer" && msg.sdp) {
+          await pc.setRemoteDescription(
+            new RTCSessionDescription({ type: "offer", sdp: msg.sdp })
+          );
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          ws.send(JSON.stringify({ type: "answer", sdp: pc.localDescription.sdp }));
+          return;
+        }
+
+        const cand = msg.candidate || (msg.type === "candidate" ? msg.candidate : null);
+        if (cand) {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+          return;
+        }
+      } catch (err) {
+        console.error("Error handling signaling message:", err);
+      }
+    };
+
+    ws.onerror = () => {
+      alert(`Failed to connect to Omniverse signaling: ${wsUrl}`);
+      disconnectOmniverseStream();
+    };
+
+    ws.onclose = () => disconnectOmniverseStream();
   };
 
   const tabs = MODE_TABS[activeMode];
@@ -287,20 +365,7 @@ export default function App() {
       {/* Background Stream */}
       <div className="stream-background">
         {isStreaming ? (
-          streamMode === "omniverse" ? (
-            <AppStream
-              onStarted={() => console.log("Omniverse stream started")}
-              onStreamFailed={() => {
-                console.error("Omniverse stream failed");
-                setIsStreaming(false);
-                setStreamMode(null);
-              }}
-              onLoggedIn={(userId) => console.log("Logged in:", userId)}
-              handleCustomEvent={(event) => console.log("Custom event:", event)}
-            />
-          ) : (
-            <video ref={videoRef} autoPlay playsInline muted className="stream-video" />
-          )
+          <video ref={videoRef} autoPlay playsInline muted className="stream-video" />
         ) : (
           <div className="no-stream-overlay">
             <div className="start-prompt">
