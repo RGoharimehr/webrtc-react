@@ -13,7 +13,7 @@
   },
   "scripts": {
     "start": "concurrently -k -n REACT,BRIDGE -c auto \"react-scripts start\" \"npm run bridge\"",
-    "bridge": "cd flownex-bridge && .\\.venv\\Scripts\\python -m uvicorn server:app --host 127.0.0.1 --port 8001",
+    "bridge": "cd flownex-bridge && python -m uvicorn server:app --host 127.0.0.1 --port 8001",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
