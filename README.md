@@ -77,6 +77,19 @@ This application uses the **REAL** NVIDIA Omniverse WebRTC Streaming Library.
 
 ## Troubleshooting
 
+### Webpack Source Map Warnings
+
+If you see warnings like:
+```
+Failed to parse source map from 'inputplaybackworker.js.map'
+```
+
+**Solution:** Already fixed in `.env` with `GENERATE_SOURCEMAP=false`
+
+This is a known issue with the NVIDIA library's missing source map files. The warning doesn't affect functionality - streaming works perfectly.
+
+**Details:** See [FIX_SOURCE_MAP_WARNINGS.md](FIX_SOURCE_MAP_WARNINGS.md)
+
 ### Common Issue: 'react-scripts' is not recognized
 
 If you see this error, run:
