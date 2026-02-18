@@ -131,6 +131,7 @@ export default function App() {
 
   // Legend state
   const [legendOpen, setLegendOpen] = useState(false);
+  // TODO: Add UI controls to change legend variable and color preset
   const legendVar = "temperature";
   const legendPreset = "turbo";
 
