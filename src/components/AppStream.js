@@ -1,10 +1,41 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
+import { AppStreamer, StreamEvent, StreamProps, DirectConfig, GFNConfig, StreamType } from '@nvidia/omniverse-webrtc-streaming-library';
 import StreamConfig from '../stream.config.json';
-// Using real NVIDIA Omniverse WebRTC Streaming Library
-import { AppStreamer, StreamType } from '@nvidia/omniverse-webrtc-streaming-library';
 
 class AppStream extends Component {
+    static defaultProps = {
+        style: {}
+    };
+
+    static propTypes = {
+        sessionId: PropTypes.string,
+        backendUrl: PropTypes.string,
+        signalingserver: PropTypes.string,
+        signalingport: PropTypes.number,
+        mediaserver: PropTypes.string,
+        mediaport: PropTypes.number,
+        accessToken: PropTypes.string,
+        style: PropTypes.object,
+        onStarted: PropTypes.func,
+        onStreamFailed: PropTypes.func,
+        onLoggedIn: PropTypes.func,
+        handleCustomEvent: PropTypes.func,
+        onFocus: PropTypes.func,
+        onBlur: PropTypes.func
+    };
+
     constructor(props) {
         super(props);
         
@@ -18,10 +49,24 @@ class AppStream extends Component {
         if (!this._requested) {
             this._requested = true;
 
+            let streamProps;
             let streamConfig;
             let streamSource;
 
-            if (StreamConfig.source === 'local') {
+            if (StreamConfig.source === 'gfn') {
+                streamSource = StreamType.GFN;
+                streamConfig = {
+                    //@ts-ignore
+                    GFN             : typeof GFN !== 'undefined' ? GFN : null,
+                    catalogClientId : StreamConfig.gfn.catalogClientId,
+                    clientId        : StreamConfig.gfn.clientId,
+                    cmsId           : StreamConfig.gfn.cmsId,
+                    onUpdate        : (message) => this._onUpdate(message),
+                    onStart         : (message) => this._onStart(message),
+                    onCustomEvent   : (message) => this._onCustomEvent(message)
+                };
+            }
+            else if (StreamConfig.source === 'local') {
                 streamSource = StreamType.DIRECT;
                 streamConfig = {
                     videoElementId: 'remote-video',
@@ -42,13 +87,41 @@ class AppStream extends Component {
                     onStop: (message) => { console.log('Stream stopped:', message) },
                     onTerminate: (message) => { console.log('Stream terminated:', message) }
                 };
-            } else {
+            }
+            else if (StreamConfig.source === 'stream') {
+                streamSource = StreamType.DIRECT;
+                streamConfig = {
+                    signalingServer: this.props.signalingserver,
+                    signalingPort: this.props.signalingport,
+                    mediaServer: this.props.mediaserver,
+                    mediaPort: this.props.mediaport,
+                    backendUrl: this.props.backendUrl,
+                    sessionId: this.props.sessionId,
+                    autoLaunch: true,
+                    cursor: 'free',
+                    mic: false,
+                    videoElementId: 'remote-video',
+                    audioElementId: 'remote-audio',
+                    authenticate: false,
+                    maxReconnects: 20,
+                    nativeTouchEvents: true,
+                    width: 1920,
+                    height: 1080,
+                    fps: 60,
+                    onUpdate: (message) => this._onUpdate(message),
+                    onStart: (message) => this._onStart(message),
+                    onCustomEvent: (message) => this._onCustomEvent(message),
+                    onStop: (message) => { console.log('Stream stopped:', message) },
+                    onTerminate: (message) => { console.log('Stream terminated:', message) }
+                };
+            }
+            else {
                 console.error(`Unknown or unsupported stream source: ${StreamConfig.source}`);
                 return;
             }
 
             try {
-                const streamProps = { streamConfig, streamSource };
+                streamProps = { streamConfig, streamSource };
                 AppStreamer.connect(streamProps)
                     .then((result) => {
                         console.info('AppStreamer connected:', result);
@@ -115,6 +188,10 @@ class AppStream extends Component {
 
         if (message.status === "error") {
             console.error('Stream error:', message.info);
+            if (StreamConfig.source === "stream") {
+                console.log(message.info);
+                alert(message.info);
+            }
             if (this.props.onStreamFailed) {
                 this.props.onStreamFailed();
             }
@@ -142,85 +219,92 @@ class AppStream extends Component {
 
     render() {
         const { style = {} } = this.props;
+        const source = StreamConfig.source;
 
-        return (
-            <div
-                key="stream-container"
-                id="omniverse-stream-container"
-                style={{
-                    backgroundColor: this.state.streamReady ? 'transparent' : '#1a1a1a',
-                    width: '100%',
-                    height: '100%',
-                    position: 'relative',
-                    ...style
-                }}
-            >
-                <video
-                    key="video-canvas"
-                    id="remote-video"
+        if (source === 'gfn') {
+            return (
+                <div
+                    id="view"
                     style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
+                        backgroundColor: this.state.streamReady ? 'white' : '#dddddd',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        height: "100%",
+                        width: "100%",
+                        ...style
+                    }}
+                />
+            );
+        } else if (source === 'local' || source === 'stream') {
+            return (
+                <div
+                    key="stream-container"
+                    id="omniverse-stream-container"
+                    style={{
+                        backgroundColor: this.state.streamReady ? 'transparent' : '#1a1a1a',
                         width: '100%',
                         height: '100%',
-                        objectFit: 'contain',
-                        visibility: this.state.streamReady ? 'visible' : 'hidden'
+                        position: 'relative',
+                        ...style
                     }}
-                    tabIndex={-1}
-                    playsInline
-                    muted
-                    autoPlay
-                />
-                <audio id="remote-audio" muted></audio>
-                
-                {/* Connection status overlay */}
-                <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    color: 'white',
-                    fontSize: '18px',
-                    textAlign: 'center',
-                    visibility: this.state.streamReady ? 'hidden' : 'visible'
-                }}>
-                    <div style={{ marginBottom: '20px' }}>
-                        <div className="spinner" style={{
-                            border: '4px solid rgba(255, 255, 255, 0.3)',
-                            borderTop: '4px solid white',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            animation: 'spin 1s linear infinite',
-                            margin: '0 auto 15px'
-                        }}></div>
+                >
+                    <video
+                        key="video-canvas"
+                        id="remote-video"
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            visibility: this.state.streamReady ? 'visible' : 'hidden'
+                        }}
+                        tabIndex={-1}
+                        playsInline
+                        muted
+                        autoPlay
+                    />
+                    <audio id="remote-audio" muted></audio>
+                    
+                    {/* Connection status overlay */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        color: 'white',
+                        fontSize: '18px',
+                        textAlign: 'center',
+                        visibility: this.state.streamReady ? 'hidden' : 'visible'
+                    }}>
+                        <div style={{ marginBottom: '20px' }}>
+                            <div className="spinner" style={{
+                                border: '4px solid rgba(255, 255, 255, 0.3)',
+                                borderTop: '4px solid white',
+                                borderRadius: '50%',
+                                width: '40px',
+                                height: '40px',
+                                animation: 'spin 1s linear infinite',
+                                margin: '0 auto 15px'
+                            }}></div>
+                        </div>
+                        <div>Connecting to Omniverse stream...</div>
                     </div>
-                    <div>Connecting to Omniverse stream...</div>
+                    
+                    {/* Add CSS animation for spinner */}
+                    <style>{`
+                        @keyframes spin {
+                            0% { transform: rotate(0deg); }
+                            100% { transform: rotate(360deg); }
+                        }
+                    `}</style>
                 </div>
-                
-                {/* Add CSS animation for spinner */}
-                <style>{`
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
-                `}</style>
-            </div>
-        );
+            );
+        }
+
+        return null;
     }
 }
-
-AppStream.propTypes = {
-    style: PropTypes.object,
-    onStarted: PropTypes.func,
-    onStreamFailed: PropTypes.func,
-    onLoggedIn: PropTypes.func,
-    handleCustomEvent: PropTypes.func
-};
-
-AppStream.defaultProps = {
-    style: {}
-};
 
 export default AppStream;
