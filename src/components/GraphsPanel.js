@@ -1,35 +1,116 @@
 import React, { useMemo, useImperativeHandle, useRef, useState, useEffect } from "react";
 
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const num = (v, fallback = 0) => {
+  const n = typeof v === "number" ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const DEFAULT_LIVE = {
+  temperature: 68.5,
+  power: 125.8,
+  pressure: 1.35,
+  velocity: 2.4,
+  humidity: 52,
+};
+
 const GraphsPanel = React.memo(
-  React.forwardRef(({ plottingVariables }, ref) => {
-    // Live data state - simulated with slight variations
-    const [liveData, setLiveData] = useState({
-      temperature: 68.5,
-      power: 125.8,
-      pressure: 1.35,
-      velocity: 2.4,
-      humidity: 52,
-    });
+  React.forwardRef(({ bridge, plottingVariables }, ref) => {
+    const [liveData, setLiveData] = useState(DEFAULT_LIVE);
 
     const iterationRef = useRef(0);
     const timeRef = useRef(0);
 
-    // Simulate live data updates every 500ms
+    // Track previous values so we can compute a simple trend (delta per update)
+    const prevRef = useRef({ ...DEFAULT_LIVE });
+    const trendRef = useRef({
+      temperature: 0,
+      power: 0,
+      pressure: 0,
+      velocity: 0,
+      humidity: 0,
+    });
+
+    // ---- 1) Pull from bridge when available ----
     useEffect(() => {
+      if (!bridge?.connected) return;
+
+      // We assume the backend sends something like:
+      // bridge.state.outputs = { temperature, pressure, power, velocity, humidity, ... }
+      const out = bridge?.state?.outputs;
+      if (!out) return;
+
+      // Map outputs -> our UI fields (adjust keys if your backend uses different names)
+      const next = {
+        temperature: num(out.temperature, liveData.temperature),
+        power: num(out.power, liveData.power),
+        pressure: num(out.pressure, liveData.pressure),
+        velocity: num(out.velocity, liveData.velocity),
+        humidity: num(out.humidity, liveData.humidity),
+      };
+
+      // Optional clamping (keeps UI sane if backend spikes)
+      next.temperature = clamp(next.temperature, 20, 90);
+      next.power = clamp(next.power, 0, 200);
+      next.pressure = clamp(next.pressure, 0.8, 2.8);
+      next.velocity = clamp(next.velocity, 0, 6);
+      next.humidity = clamp(next.humidity, 0, 100);
+
+      // compute trends
+      const prev = prevRef.current;
+      trendRef.current = {
+        temperature: next.temperature - prev.temperature,
+        power: next.power - prev.power,
+        pressure: next.pressure - prev.pressure,
+        velocity: next.velocity - prev.velocity,
+        humidity: next.humidity - prev.humidity,
+      };
+      prevRef.current = next;
+
+      // time bookkeeping (if backend provides time/iteration, prefer it)
+      iterationRef.current += 1;
+      timeRef.current += 0.5;
+
+      setLiveData(next);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+      bridge?.connected,
+      bridge?.state?.outputs, // if your state object identity changes, this will fire (OK)
+    ]);
+
+    // ---- 2) Fallback simulation ONLY when bridge is not connected ----
+    useEffect(() => {
+      if (bridge?.connected) return;
+
       const interval = setInterval(() => {
-        setLiveData((prev) => ({
-          temperature: Math.max(20, Math.min(90, prev.temperature + (Math.random() - 0.5) * 2)),
-          power: Math.max(0, Math.min(200, prev.power + (Math.random() - 0.5) * 3)),
-          pressure: Math.max(0.8, Math.min(2.8, prev.pressure + (Math.random() - 0.5) * 0.1)),
-          velocity: Math.max(0, Math.min(6, prev.velocity + (Math.random() - 0.5) * 0.3)),
-          humidity: Math.max(0, Math.min(100, prev.humidity + (Math.random() - 0.5) * 1.5)),
-        }));
-        iterationRef.current += 1;
-        timeRef.current += 0.5;
+        setLiveData((prev) => {
+          const next = {
+            temperature: clamp(prev.temperature + (Math.random() - 0.5) * 2, 20, 90),
+            power: clamp(prev.power + (Math.random() - 0.5) * 3, 0, 200),
+            pressure: clamp(prev.pressure + (Math.random() - 0.5) * 0.1, 0.8, 2.8),
+            velocity: clamp(prev.velocity + (Math.random() - 0.5) * 0.3, 0, 6),
+            humidity: clamp(prev.humidity + (Math.random() - 0.5) * 1.5, 0, 100),
+          };
+
+          // trend vs previous
+          trendRef.current = {
+            temperature: next.temperature - prev.temperature,
+            power: next.power - prev.power,
+            pressure: next.pressure - prev.pressure,
+            velocity: next.velocity - prev.velocity,
+            humidity: next.humidity - prev.humidity,
+          };
+          prevRef.current = next;
+
+          iterationRef.current += 1;
+          timeRef.current += 0.5;
+
+          return next;
+        });
       }, 500);
 
       return () => clearInterval(interval);
-    }, []);
+    }, [bridge?.connected]);
 
     // Expose API to parent via ref
     useImperativeHandle(ref, () => ({
@@ -37,10 +118,17 @@ const GraphsPanel = React.memo(
         timestamp: new Date(),
         time: timeRef.current,
         iteration: iterationRef.current,
-        distance: timeRef.current * 0.5, // Mock distance: assumes constant velocity of 0.5 m/s
+        distance: timeRef.current * 0.5, // Mock distance (keep or replace later)
         ...liveData,
       }),
     }));
+
+    // Format trend as a signed string like "+0.12"
+    const trendStr = (k, decimals = 2) => {
+      const d = num(trendRef.current?.[k], 0);
+      const s = d >= 0 ? "+" : "";
+      return `${s}${d.toFixed(decimals)}`;
+    };
 
     const activeGraphs = useMemo(() => {
       const graphs = {
@@ -48,7 +136,7 @@ const GraphsPanel = React.memo(
           enabled: plottingVariables.temperature,
           value: liveData.temperature,
           unit: "°C",
-          trend: "+2.3",
+          trend: trendStr("temperature", 2),
           title: "Temperature Trend",
           stroke: "#ff6b6b",
           gradientId: "tempGradient",
@@ -58,7 +146,7 @@ const GraphsPanel = React.memo(
           enabled: plottingVariables.power,
           value: liveData.power,
           unit: "kW",
-          trend: "-1.2",
+          trend: trendStr("power", 2),
           title: "Power Trend",
           stroke: "#86ef47",
           gradientId: "powerGradient",
@@ -68,7 +156,7 @@ const GraphsPanel = React.memo(
           enabled: plottingVariables.pressure,
           value: liveData.pressure,
           unit: "bar",
-          trend: "+0.05",
+          trend: trendStr("pressure", 3),
           title: "Pressure Trend",
           stroke: "#0050E0",
           gradientId: "pressureGradient",
@@ -78,7 +166,7 @@ const GraphsPanel = React.memo(
           enabled: plottingVariables.velocity,
           value: liveData.velocity,
           unit: "m/s",
-          trend: "+0.1",
+          trend: trendStr("velocity", 2),
           title: "Velocity Trend",
           stroke: "#00ffff",
           gradientId: "velocityGradient",
@@ -88,7 +176,7 @@ const GraphsPanel = React.memo(
           enabled: plottingVariables.humidity,
           value: liveData.humidity,
           unit: "%",
-          trend: "+1.0",
+          trend: trendStr("humidity", 1),
           title: "Humidity Trend",
           stroke: "#4a9eff",
           gradientId: "humidityGradient",
@@ -96,40 +184,33 @@ const GraphsPanel = React.memo(
         },
       };
 
-    // "Good/bad" depends on the metric.
-    // Temperature: up is bad, down is good
-    // Power: down is good, up is bad
-    // Others: up = neutral, down = neutral (you can customize later)
-    const getTrendTone = (metricId, trendStr) => {
-      const isPlus = String(trendStr).trim().startsWith("+");
-      const isMinus = String(trendStr).trim().startsWith("-");
+      const getTrendTone = (metricId, trendStrVal) => {
+        const isPlus = String(trendStrVal).trim().startsWith("+");
+        const isMinus = String(trendStrVal).trim().startsWith("-");
 
-      if (metricId === "temperature") {
-        if (isPlus) return "bad";
-        if (isMinus) return "good";
+        if (metricId === "temperature") {
+          if (isPlus) return "bad";
+          if (isMinus) return "good";
+          return "neutral";
+        }
+
+        if (metricId === "power") {
+          if (isMinus) return "good";
+          if (isPlus) return "bad";
+          return "neutral";
+        }
+
         return "neutral";
-      }
+      };
 
-      if (metricId === "power") {
-        if (isMinus) return "good";
-        if (isPlus) return "bad";
-        return "neutral";
-      }
+      const metricOrder = ["temperature", "power", "pressure", "velocity", "humidity"];
 
-      // default for others
-      return "neutral";
-    };
-
-    const metricOrder = ["temperature", "power", "pressure", "velocity", "humidity"];
-
-      return metricOrder.map((key) => {
-        const g = graphs[key];
-        return {
-          key,
-          graph: g,
-          tone: getTrendTone(key, g?.trend || "0"),
-        };
-      }).filter((item) => item.graph?.enabled);
+      return metricOrder
+        .map((key) => {
+          const g = graphs[key];
+          return { key, graph: g, tone: getTrendTone(key, g?.trend || "0") };
+        })
+        .filter((item) => item.graph?.enabled);
     }, [plottingVariables, liveData]);
 
     return (
@@ -147,24 +228,26 @@ const GraphsPanel = React.memo(
                       <stop offset="100%" style={{ stopColor: g.stroke, stopOpacity: 0.05 }} />
                     </linearGradient>
                   </defs>
-
                   <path d={g.path} fill={`url(#${g.gradientId})`} stroke={g.stroke} strokeWidth="2" />
                 </svg>
               </div>
 
-              {/* ✅ single row: Current (left) + Trend chip (right) */}
               <div className="graph-metric-row">
                 <div className="metric-current">
                   <div className="metric-current-label">Current</div>
                   <div className="metric-current-value">
-                    {key === 'humidity' ? g.value.toFixed(1) : g.value.toFixed(2)}
+                    {key === "humidity" ? g.value.toFixed(1) : g.value.toFixed(2)}
                     <span className="metric-unit">{g.unit}</span>
                   </div>
                 </div>
 
                 <div className={`metric-trend-chip ${tone}`}>
                   <span className="metric-trend-arrow" aria-hidden="true">
-                    {String(g.trend).trim().startsWith("+") ? "▲" : String(g.trend).trim().startsWith("-") ? "▼" : "•"}
+                    {String(g.trend).trim().startsWith("+")
+                      ? "▲"
+                      : String(g.trend).trim().startsWith("-")
+                      ? "▼"
+                      : "•"}
                   </span>
                   <span className="metric-trend-value">
                     {g.trend}
@@ -172,6 +255,11 @@ const GraphsPanel = React.memo(
                   </span>
                   <span className="metric-trend-label">Trend</span>
                 </div>
+              </div>
+
+              {/* Optional tiny footer to show source */}
+              <div style={{ marginTop: 8, fontSize: 11, opacity: 0.6 }}>
+                Source: {bridge?.connected ? "Bridge" : "Simulated"}
               </div>
             </div>
           ))}

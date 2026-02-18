@@ -8,8 +8,12 @@
     "react-scripts": "5.0.1",
     "xlsx": "^0.18.5"
   },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "concurrently -k -n REACT,BRIDGE -c auto \"react-scripts start\" \"npm run bridge\"",
+    "bridge": "cd flownex-bridge && .\\.venv\\Scripts\\python -m uvicorn server:app --host 127.0.0.1 --port 8001",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
+import { useBridge } from "./bridge/useBridge";
 
 import OperatingConditions from "./tabs/OperatingConditions";
 import GeometricalDesign from "./tabs/GeometricalDesign";
@@ -83,7 +84,10 @@ const LEGEND_PRESETS = [
   },
 ];
 
-function App() {
+export default function App() {
+  // ✅ hooks must be INSIDE the component
+  const bridge = useBridge();
+
   // WebRTC refs
   const pcRef = useRef(null);
   const wsRef = useRef(null);
@@ -95,7 +99,7 @@ function App() {
 
   // Streaming mode: "omniverse" | "screen" | null
   const [streamMode, setStreamMode] = useState(null);
-  
+
   // Ref to track current stream for cleanup
   const screenStreamRef = useRef(null);
 
@@ -113,10 +117,7 @@ function App() {
 
   const [activeTab, setActiveTab] = useState(() => {
     const savedMode = sessionStorage.getItem("activeMode") || "SIMULATE";
-    return (
-      sessionStorage.getItem(`activeTab:${savedMode}`) ||
-      MODE_TABS[savedMode][0]
-    );
+    return sessionStorage.getItem(`activeTab:${savedMode}`) || MODE_TABS[savedMode][0];
   });
 
   // Shared plotting state
@@ -137,8 +138,7 @@ function App() {
     LEGEND_VARIABLES.find((v) => v.id === legendVar) || LEGEND_VARIABLES[0];
 
   const legendGradient =
-    (LEGEND_PRESETS.find((p) => p.id === legendPreset) || LEGEND_PRESETS[0])
-      .gradient;
+    (LEGEND_PRESETS.find((p) => p.id === legendPreset) || LEGEND_PRESETS[0]).gradient;
 
   // Persist mode & tab per mode
   useEffect(() => {
@@ -153,18 +153,14 @@ function App() {
   useEffect(() => {
     const saved = sessionStorage.getItem(`activeTab:${activeMode}`);
     const next =
-      saved && MODE_TABS[activeMode].includes(saved)
-        ? saved
-        : MODE_TABS[activeMode][0];
+      saved && MODE_TABS[activeMode].includes(saved) ? saved : MODE_TABS[activeMode][0];
     setActiveTab(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMode]);
 
   // Attach stream to video
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.srcObject = screenStream || null;
-    }
+    if (videoRef.current) videoRef.current.srcObject = screenStream || null;
   }, [screenStream]);
 
   // Keep ref in sync with screenStream for cleanup
@@ -193,9 +189,7 @@ function App() {
 
   const stopScreenShare = () => {
     try {
-      if (screenStream) {
-        screenStream.getTracks().forEach((t) => t.stop());
-      }
+      if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
     } catch (e) {
       console.warn("Error stopping screen share:", e);
     }
@@ -211,7 +205,6 @@ function App() {
     } catch (e) {
       console.warn("Error disconnecting Omniverse stream:", e);
     }
-
     pcRef.current = null;
     wsRef.current = null;
     setScreenStream(null);
@@ -221,7 +214,6 @@ function App() {
 
   const startScreenShare = async () => {
     try {
-      // Stop any active Omniverse session first
       disconnectOmniverseStream();
 
       const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -242,10 +234,8 @@ function App() {
   };
 
   const connectOmniverseStream = async () => {
-    // Stop any active screen-share first
     stopScreenShare();
 
-    // Use env if set; otherwise use localhost defaults
     const host = process.env.REACT_APP_OV_SIGNAL_HOST || "localhost";
     const port = process.env.REACT_APP_OV_SIGNAL_PORT || "49100";
     const proto = process.env.REACT_APP_OV_SIGNAL_PROTO || "ws";
@@ -253,7 +243,6 @@ function App() {
     const wsUrl = `${proto}://${host}:${port}`;
     console.log("Connecting to Omniverse signaling:", wsUrl);
 
-    // reset any old session
     disconnectOmniverseStream();
 
     const ws = new WebSocket(wsUrl);
@@ -279,27 +268,18 @@ function App() {
       }
     };
 
-    ws.onopen = () => {
-      console.log("Signaling connected.");
-      // Some server builds require a kickoff message to request an offer.
-      // If you need it, uncomment ONE:
-      // ws.send(JSON.stringify({ action: "request_offer" }));
-      // ws.send(JSON.stringify({ type: "request_offer" }));
-    };
+    ws.onopen = () => console.log("Signaling connected.");
 
     ws.onmessage = async (evt) => {
       let msg;
       try {
         msg = JSON.parse(evt.data);
-      } catch (e) {
+      } catch {
         console.warn("Non-JSON signaling message:", evt.data);
         return;
       }
 
-      console.log("Signal:", msg);
-
       try {
-        // Pattern A: { sdp: { type:"offer", sdp:"..." } }
         if (msg.sdp && msg.sdp.type) {
           await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
           const answer = await pc.createAnswer();
@@ -308,7 +288,6 @@ function App() {
           return;
         }
 
-        // Pattern B: { type:"offer", sdp:"..." }
         if (msg.type === "offer" && msg.sdp) {
           await pc.setRemoteDescription(
             new RTCSessionDescription({ type: "offer", sdp: msg.sdp })
@@ -319,9 +298,7 @@ function App() {
           return;
         }
 
-        // ICE candidates
-        const cand =
-          msg.candidate || (msg.type === "candidate" ? msg.candidate : null);
+        const cand = msg.candidate || (msg.type === "candidate" ? msg.candidate : null);
         if (cand) {
           await pc.addIceCandidate(new RTCIceCandidate(cand));
           return;
@@ -331,16 +308,12 @@ function App() {
       }
     };
 
-    ws.onerror = (e) => {
-      console.error("WebSocket error:", e);
+    ws.onerror = () => {
       alert(`Failed to connect to Omniverse signaling: ${wsUrl}`);
       disconnectOmniverseStream();
     };
 
-    ws.onclose = () => {
-      console.log("Signaling closed.");
-      disconnectOmniverseStream();
-    };
+    ws.onclose = () => disconnectOmniverseStream();
   };
 
   const tabs = MODE_TABS[activeMode];
@@ -359,27 +332,28 @@ function App() {
 
     switch (activeTab) {
       case "Operating Conditions":
-        return <OperatingConditions />;
+        return <OperatingConditions bridge={bridge} />;
       case "Geometrical Design":
-        return <GeometricalDesign />;
+        return <GeometricalDesign bridge={bridge} />;
       case "Results Visualization":
-        return <ResultsVisualization />;
+        return <ResultsVisualization bridge={bridge} />;
       case "Plotting":
         return (
           <Plotting
+            bridge={bridge}
             plottingVariables={plottingVariables}
             setPlottingVariables={setPlottingVariables}
             graphsApiRef={graphsApiRef}
           />
         );
       case "CFD Analysis":
-        return <CFDAnalysis />;
+        return <CFDAnalysis bridge={bridge} />;
       case "Configuration":
-        return <Configuration />;
+        return <Configuration bridge={bridge} />;
       case "Results Mapping":
-        return <ResultsMapping />;
+        return <ResultsMapping bridge={bridge} />;
       default:
-        return <OperatingConditions />;
+        return <OperatingConditions bridge={bridge} />;
     }
   };
 
@@ -402,14 +376,12 @@ function App() {
               <h2>Omniverse WebRTC Monitor</h2>
               <p>Choose a stream source</p>
 
-              {/* Button 1: Omniverse */}
               <button className="start-stream-button" onClick={connectOmniverseStream}>
                 ▶ Connect Omniverse Stream
               </button>
 
               <div style={{ height: 10 }} />
 
-              {/* Button 2: Desktop screen share */}
               <button
                 className="start-stream-button"
                 onClick={startScreenShare}
@@ -457,22 +429,14 @@ function App() {
           <span className="panel-title">Live Metrics</span>
         </div>
 
-        <GraphsPanel 
-          plottingVariables={plottingVariables}
-          ref={graphsApiRef}
-        />
+        <GraphsPanel bridge={bridge} plottingVariables={plottingVariables} ref={graphsApiRef} />
       </DraggableResizable>
 
       {/* LEGEND */}
       {plotsExpanded && (
         <div className={`legend-vertical-frame ${legendOpen ? "open" : ""}`}>
           <div className="legend-top-row">
-            <button
-              className="legend-gear"
-              onClick={() => setLegendOpen((v) => !v)}
-              title="Legend settings"
-              aria-label="Legend settings"
-            >
+            <button className="legend-gear" onClick={() => setLegendOpen((v) => !v)}>
               ⚙
             </button>
           </div>
@@ -483,7 +447,6 @@ function App() {
                 {legendVarObj.max}
                 {legendVarObj.units}
               </div>
-
               <div className="legend-value-min">
                 {legendVarObj.min}
                 {legendVarObj.units}
@@ -491,60 +454,9 @@ function App() {
             </div>
 
             <div className="legend-bar-vertical-wrap">
-              <div
-                className="legend-bar-vertical"
-                style={{ background: legendGradient }}
-                aria-hidden="true"
-              />
+              <div className="legend-bar-vertical" style={{ background: legendGradient }} />
             </div>
           </div>
-
-          {legendOpen && (
-            <div className="legend-settings-pop">
-              <div className="legend-settings-head">
-                <div className="legend-settings-title">Legend Settings</div>
-                <button
-                  className="legend-settings-close"
-                  onClick={() => setLegendOpen(false)}
-                  aria-label="Close legend settings"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="legend-settings-grid">
-                <label className="legend-setting">
-                  <div className="legend-setting-label">Variable</div>
-                  <select
-                    className="legend-select"
-                    value={legendVar}
-                    onChange={(e) => setLegendVar(e.target.value)}
-                  >
-                    {LEGEND_VARIABLES.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="legend-setting">
-                  <div className="legend-setting-label">Palette</div>
-                  <select
-                    className="legend-select"
-                    value={legendPreset}
-                    onChange={(e) => setLegendPreset(e.target.value)}
-                  >
-                    {LEGEND_PRESETS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -577,30 +489,22 @@ function App() {
         <div className="drag-handle panel-header-custom" title="Drag to move">
           <span className="panel-title">Dashboard Control</span>
 
-          {/* Streaming pill controls active stream mode */}
+          <span
+            className={`streaming-pill ${bridge.connected ? "on" : "off"}`}
+            style={{ marginLeft: 10, cursor: "default" }}
+            title={bridge.connected ? "Bridge connected" : "Bridge disconnected"}
+          >
+            {bridge.connected ? "BRIDGE" : "NO BRIDGE"}
+          </span>
+
           <button
             className={`streaming-pill ${isStreaming ? "on" : "off"}`}
-            onClick={() => {
-              if (!isStreaming) {
-                // Default START = Omniverse (you can change to screen if you want)
-                connectOmniverseStream();
-              } else {
-                stopActiveStream();
-              }
-            }}
-            title={
-              isStreaming
-                ? streamMode === "screen"
-                  ? "Click to stop screen sharing"
-                  : "Click to disconnect Omniverse stream"
-                : "Click to start Omniverse stream"
-            }
+            onClick={() => (!isStreaming ? connectOmniverseStream() : stopActiveStream())}
           >
             {isStreaming ? (streamMode === "screen" ? "SCREEN" : "STREAMING") : "START"}
           </button>
         </div>
 
-        {/* MODE BAR */}
         <div className="hud-mode-nav">
           <div className="hud-mode-scroll">
             {MODE_ORDER.map((mode) => (
@@ -615,7 +519,6 @@ function App() {
           </div>
         </div>
 
-        {/* SUB-TABS */}
         <div className="hud-tab-navigation">
           <div className="hud-tab-scroll">
             {tabs.map((tab) => (
@@ -630,7 +533,6 @@ function App() {
           </div>
         </div>
 
-        {/* CONTENT */}
         <div className="hud-content">{renderTabContent()}</div>
       </DraggableResizable>
 
@@ -654,5 +556,3 @@ function App() {
     </div>
   );
 }
-
-export default App;
