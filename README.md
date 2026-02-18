@@ -17,7 +17,6 @@ npm --version   # Should show 10.x.x or higher
 **If you need to upgrade:**
 - Download from [nodejs.org](https://nodejs.org/)
 - Use [nvm](https://github.com/nvm-sh/nvm) (recommended): `nvm install 18`
-- See [NODE_VERSION_REQUIREMENTS.md](NODE_VERSION_REQUIREMENTS.md) for detailed upgrade instructions
 
 **Note:** The NVIDIA Omniverse WebRTC Streaming Library requires Node.js 18+ for proper WebRTC support.
 
@@ -55,33 +54,12 @@ The application will open at `http://localhost:3000`
 
 ## Omniverse Streaming (REAL - Not Stub)
 
-This application uses the **REAL** NVIDIA Omniverse WebRTC Streaming Library and supports all three official deployment modes.
+This application uses the **REAL** NVIDIA Omniverse WebRTC Streaming Library.
 
 **Important:** Omniverse streaming and Flownex backend are **separate systems**.
 
 - **Omniverse:** Frontend WebRTC video streaming (REAL library)
 - **Flownex:** Backend Python API bridge (can be stub or real, independent)
-
-### Three Streaming Modes
-
-The AppStream component supports all three NVIDIA-recommended deployment modes:
-
-1. **Local (DIRECT)** - Default mode for development
-   - Connect directly to Kit running on your machine
-   - Uses localhost:49100 by default
-   - Perfect for development and testing
-
-2. **Stream (OKAS)** - Omniverse Kit Application Streaming
-   - On-demand cloud streaming
-   - Enterprise managed deployment
-   - Requires session management
-
-3. **GFN (Graphics Delivery Network)** - Enterprise streaming
-   - NVIDIA GeForce NOW infrastructure
-   - Requires GFN credentials
-   - Full SDK integration
-
-**See:** [APPSTREAM_IMPLEMENTATION.md](APPSTREAM_IMPLEMENTATION.md) for complete guide
 
 ### Setup for Omniverse Streaming
 
@@ -92,14 +70,12 @@ The AppStream component supports all three NVIDIA-recommended deployment modes:
    ```
 
 2. **Configure streaming:**
-   Edit `stream.config.json` to select your mode:
+   Edit `stream.config.json` with your Omniverse Kit server address
    
-   ```json
-   {
-     "source": "local",  // or "stream" or "gfn"
-     "local": { "server": "127.0.0.1", "signalingPort": 49100 }
-   }
-   ```
+   **Streaming Modes:**
+   - **Local** (default): Connect to Kit on your machine or network
+   - **Stream (OKAS)**: On-demand cloud streaming
+   - **GFN**: Graphics Delivery Network streaming
    
    See [STREAM_CONFIGURATION.md](STREAM_CONFIGURATION.md) for detailed configuration options.
 
@@ -120,29 +96,6 @@ The AppStream component supports all three NVIDIA-recommended deployment modes:
 **For detailed setup:** See [OMNIVERSE_REAL_LIBRARY.md](OMNIVERSE_REAL_LIBRARY.md)
 
 ## Troubleshooting
-
-### Node.js Version Warning (EBADENGINE)
-
-If you see:
-```
-npm warn EBADENGINE Unsupported engine
-npm warn EBADENGINE   required: { node: '^18.0.0', npm: '^10.0.0' }
-```
-
-**Solution:** Upgrade to Node.js 18 or higher
-
-**Quick fix:**
-```bash
-# Check versions
-node --version
-npm --version
-
-# Upgrade via nvm (recommended)
-nvm install 18
-nvm use 18
-```
-
-**Details:** See [NODE_VERSION_REQUIREMENTS.md](NODE_VERSION_REQUIREMENTS.md)
 
 ### Webpack Source Map Warnings
 
