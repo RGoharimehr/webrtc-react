@@ -165,13 +165,6 @@ export default function App() {
       } catch (e) {
         console.warn("Cleanup error (stream):", e);
       }
-      try {
-        if (streamMode === "omniverse") {
-          AppStream.stop();
-        }
-      } catch (e) {
-        console.warn("Cleanup error (AppStream):", e);
-      }
     };
   }, [streamMode]);
 
@@ -192,11 +185,6 @@ export default function App() {
   };
 
   const disconnectOmniverseStream = () => {
-    try {
-      AppStream.stop();
-    } catch (e) {
-      console.warn("Error disconnecting Omniverse stream:", e);
-    }
     setIsStreaming(false);
     setStreamMode(null);
   };
