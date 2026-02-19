@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import { useBridge } from "./bridge/useBridge";
+import { LEGEND_VARIABLES, LEGEND_PRESETS } from "./simulationEnv";
 
 import OperatingConditions from "./tabs/OperatingConditions";
 import GeometricalDesign from "./tabs/GeometricalDesign";
@@ -31,66 +32,13 @@ const MODE_TABS = {
   BUILD: ["Configuration", "Results Mapping"],
 };
 
-/* =========================
-   Legend config
-   ========================= */
-const LEGEND_VARIABLES = [
-  { id: "temperature", label: "Temperature", units: "°C", min: 20, max: 90 },
-  { id: "pressure", label: "Pressure", units: "bar", min: 0.8, max: 2.8 },
-  { id: "power", label: "Power", units: "kW", min: 0, max: 200 },
-  { id: "velocity", label: "Velocity", units: "m/s", min: 0, max: 6 },
-  { id: "humidity", label: "Humidity", units: "%", min: 0, max: 100 },
-];
-
-const LEGEND_PRESETS = [
-  {
-    id: "viridis",
-    name: "Viridis",
-    gradient: "linear-gradient(180deg, #440154, #31688e, #35b779, #fde725)",
-  },
-  {
-    id: "inferno",
-    name: "Inferno",
-    gradient:
-      "linear-gradient(180deg, #000004, #420a68, #932567, #dd513a, #fca50a, #fcffa4)",
-  },
-  {
-    id: "magma",
-    name: "Magma",
-    gradient:
-      "linear-gradient(180deg, #000004, #3b0f70, #8c2981, #de4968, #fe9f6d, #fcfdbf)",
-  },
-  {
-    id: "plasma",
-    name: "Plasma",
-    gradient:
-      "linear-gradient(180deg, #0d0887, #7e03a8, #cc4678, #f89441, #f0f921)",
-  },
-  {
-    id: "turbo",
-    name: "Turbo",
-    gradient:
-      "linear-gradient(180deg, #30123b, #3b4cc0, #2ab9a1, #aadb32, #e6550d, #7f0000)",
-  },
-  {
-    id: "coolwarm",
-    name: "Cool–Warm",
-    gradient:
-      "linear-gradient(180deg, #3b4cc0, #788bff, #e6e6e6, #f2906b, #b40426)",
-  },
-  {
-    id: "gray",
-    name: "Grayscale",
-    gradient: "linear-gradient(180deg, #000000, #ffffff)",
-  },
-];
-
 export default function App() {
   // ✅ hooks must be INSIDE the component
   const bridge = useBridge();
 
   // Streaming state
   const [isStreaming, setIsStreaming] = useState(false);
+  const [streamKey, setStreamKey] = useState(0);
 
   // Streaming mode: "omniverse" | "screen" | null
   const [streamMode, setStreamMode] = useState(null);
@@ -129,12 +77,17 @@ export default function App() {
   const [legendOpen, setLegendOpen] = useState(false);
   const [legendVar, setLegendVar] = useState("temperature");
   const [legendPreset, setLegendPreset] = useState("turbo");
+  // Per-property manual min/max overrides: { [varId]: { min, max } }
+  const [legendRanges, setLegendRanges] = useState({});
 
   const legendVarObj =
     LEGEND_VARIABLES.find((v) => v.id === legendVar) || LEGEND_VARIABLES[0];
 
   const legendGradient =
     (LEGEND_PRESETS.find((p) => p.id === legendPreset) || LEGEND_PRESETS[0]).gradient;
+
+  const effectiveMin = legendRanges[legendVar]?.min ?? legendVarObj.min;
+  const effectiveMax = legendRanges[legendVar]?.max ?? legendVarObj.max;
 
   // Persist mode & tab per mode
   useEffect(() => {
@@ -214,6 +167,7 @@ export default function App() {
 
   const connectOmniverseStream = () => {
     stopScreenShare();
+    setStreamKey((k) => k + 1);
     setIsStreaming(true);
     setStreamMode("omniverse");
   };
@@ -247,6 +201,8 @@ export default function App() {
             setLegendPreset={setLegendPreset}
             legendVariables={LEGEND_VARIABLES}
             legendPresets={LEGEND_PRESETS}
+            effectiveMin={effectiveMin}
+            effectiveMax={effectiveMax}
           />
         );
       case "Plotting":
@@ -274,6 +230,16 @@ export default function App() {
     else disconnectOmniverseStream();
   };
 
+  const updateLegendRange = (field, rawValue) => {
+    const v = parseFloat(rawValue);
+    if (Number.isFinite(v)) {
+      setLegendRanges((r) => ({
+        ...r,
+        [legendVar]: { ...(r[legendVar] || {}), [field]: v },
+      }));
+    }
+  };
+
   return (
     <div className="App">
       {/* Background Stream */}
@@ -281,6 +247,7 @@ export default function App() {
         {isStreaming ? (
           streamMode === "omniverse" ? (
             <AppStream
+              key={streamKey}
               onStarted={() => console.log("Omniverse stream started")}
               onStreamFailed={() => {
                 console.error("Omniverse stream failed");
@@ -368,11 +335,11 @@ export default function App() {
           <div className="legend-body">
             <div className="legend-values">
               <div className="legend-value-max">
-                {legendVarObj.max}
+                {effectiveMax}
                 {legendVarObj.units}
               </div>
               <div className="legend-value-min">
-                {legendVarObj.min}
+                {effectiveMin}
                 {legendVarObj.units}
               </div>
             </div>
@@ -381,6 +348,55 @@ export default function App() {
               <div className="legend-bar-vertical" style={{ background: legendGradient }} />
             </div>
           </div>
+
+          {legendOpen && (
+            <div className="legend-settings-pop">
+              <div className="legend-settings-grid">
+                <div className="legend-setting">
+                  <label className="legend-setting-label">Property</label>
+                  <select
+                    className="legend-select"
+                    value={legendVar}
+                    onChange={(e) => setLegendVar(e.target.value)}
+                  >
+                    {LEGEND_VARIABLES.map((v) => (
+                      <option key={v.id} value={v.id}>{v.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="legend-setting">
+                  <label className="legend-setting-label">Color Map</label>
+                  <select
+                    className="legend-select"
+                    value={legendPreset}
+                    onChange={(e) => setLegendPreset(e.target.value)}
+                  >
+                    {LEGEND_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="legend-setting">
+                  <label className="legend-setting-label">Min ({legendVarObj.units})</label>
+                  <input
+                    type="number"
+                    className="legend-range-input"
+                    value={effectiveMin}
+                    onChange={(e) => updateLegendRange("min", e.target.value)}
+                  />
+                </div>
+                <div className="legend-setting">
+                  <label className="legend-setting-label">Max ({legendVarObj.units})</label>
+                  <input
+                    type="number"
+                    className="legend-range-input"
+                    value={effectiveMax}
+                    onChange={(e) => updateLegendRange("max", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

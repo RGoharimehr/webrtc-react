@@ -623,7 +623,7 @@ button.success:hover { background: #74B405; }
 /* Expanded when settings open */
 .legend-vertical-frame.open {
   width: 200px;    /* fixed so settings has room */
-  height: 350px;
+  height: 600px;
   padding: 12px;
 }
 
@@ -832,6 +832,26 @@ button.success:hover { background: #74B405; }
 .legend-vertical-frame select.legend-select option {
   background-color: rgba(18, 18, 18, 0.8);
   color: rgba(255,255,255,0.92);
+}
+
+/* Range number inputs inside the legend settings panel */
+.legend-vertical-frame input.legend-range-input {
+  height: 30px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.92);
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  outline: none;
+}
+
+.legend-vertical-frame input.legend-range-input:focus {
+  border-color: rgba(134,239,71,0.8);
+  box-shadow: 0 0 0 2px rgba(134,239,71,0.20);
 }
 
 /* =========================
