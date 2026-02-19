@@ -20,7 +20,14 @@ class AppStream extends Component {
 
             // Ensure the singleton is fully stopped before (re)connecting.
             // This is safe to call even when not yet connected.
-            try { AppStreamer.stop(); } catch (error) {
+            // The real library may return a rejected Promise (not just throw synchronously),
+            // so we must also handle the async rejection to prevent unhandled rejection errors.
+            try {
+                const stopResult = AppStreamer.stop();
+                if (stopResult && typeof stopResult.catch === 'function') {
+                    stopResult.catch((error) => console.warn('AppStreamer.stop() before connect failed:', error));
+                }
+            } catch (error) {
                 console.warn('AppStreamer.stop() before connect failed:', error);
             }
 
@@ -88,7 +95,10 @@ class AppStream extends Component {
 
     componentWillUnmount() {
         try {
-            AppStreamer.stop();
+            const stopResult = AppStreamer.stop();
+            if (stopResult && typeof stopResult.catch === 'function') {
+                stopResult.catch((error) => console.warn('Error stopping AppStreamer:', error));
+            }
         } catch (error) {
             console.warn('Error stopping AppStreamer:', error);
         }
