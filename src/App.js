@@ -239,22 +239,21 @@ export default function App() {
       case "Geometrical Design":
         return <GeometricalDesign bridge={bridge} />;
       case "Results Visualization":
-        return <ResultsVisualization bridge={bridge} />;
+        return <ResultsVisualization />;
       case "Plotting":
         return (
           <Plotting
-            bridge={bridge}
             plottingVariables={plottingVariables}
             setPlottingVariables={setPlottingVariables}
             graphsApiRef={graphsApiRef}
           />
         );
       case "CFD Analysis":
-        return <CFDAnalysis bridge={bridge} />;
+        return <CFDAnalysis />;
       case "Configuration":
         return <Configuration bridge={bridge} />;
       case "Results Mapping":
-        return <ResultsMapping bridge={bridge} />;
+        return <ResultsMapping />;
       default:
         return <OperatingConditions bridge={bridge} />;
     }
