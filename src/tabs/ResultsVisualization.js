@@ -30,6 +30,10 @@ const ResultsVisualization = ({
     AppStream.sendMessage(msg);
   };
 
+  // The gradient presets are stored as vertical (180deg) for the sidebar legend bar.
+  // The preview bar here is horizontal, so we rotate the direction to 90deg.
+  const horizontalGradient = selectedPresetObj.gradient.replaceAll('180deg', '90deg');
+
   return (
     <div>
       <div className="section">
@@ -72,7 +76,7 @@ const ResultsVisualization = ({
 
         <div style={{
           height: '36px',
-          background: selectedPresetObj.gradient,
+          background: horizontalGradient,
           backgroundSize: '100% 100%',
           borderRadius: '8px',
           position: 'relative',

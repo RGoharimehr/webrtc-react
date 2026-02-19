@@ -18,6 +18,12 @@ class AppStream extends Component {
         if (!this._requested) {
             this._requested = true;
 
+            // Ensure the singleton is fully stopped before (re)connecting.
+            // This is safe to call even when not yet connected.
+            try { AppStreamer.stop(); } catch (error) {
+                console.warn('AppStreamer.stop() before connect failed:', error);
+            }
+
             let streamConfig;
             let streamSource;
 
