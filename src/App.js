@@ -307,7 +307,7 @@ export default function App() {
         initialX={14}
         initialY={14}
         initialWidth={260}
-        initialHeight={650}
+        initialHeight={Math.min(650, window.innerHeight - 28)}
         minWidth={220}
         minHeight={240}
         maxWidth={420}
@@ -417,7 +417,7 @@ export default function App() {
         initialX={Math.max(20, window.innerWidth - 320)}
         initialY={14}
         initialWidth={300}
-        initialHeight={720}
+        initialHeight={Math.min(720, window.innerHeight - 28)}
         minWidth={270}
         minHeight={280}
         maxWidth={520}

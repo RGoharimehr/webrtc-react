@@ -4,7 +4,10 @@ import StreamConfig from '../stream.config.json';
 // Using real NVIDIA Omniverse WebRTC Streaming Library
 import { AppStreamer, StreamType } from '@nvidia/omniverse-webrtc-streaming-library';
 
-class AppStream extends Component {
+// Delay after calling AppStreamer.stop() before calling connect().
+// The library Promise resolves client-side before the Omniverse NVST server
+// finishes releasing its threads; connecting too soon causes NVST_R_BUSY.
+const NVST_SERVER_TEARDOWN_DELAY_MS = 2000;
     constructor(props) {
         super(props);
         
@@ -37,6 +40,13 @@ class AppStream extends Component {
 
         if (!this._requested) return; // component was unmounted while stopping
 
+        // Give the Omniverse NVST server time to fully release its threads after stop().
+        // The library Promise resolves client-side before server-side teardown completes,
+        // so connecting too soon causes NVST_R_BUSY errors.
+        await new Promise((resolve) => setTimeout(resolve, NVST_SERVER_TEARDOWN_DELAY_MS));
+
+        if (!this._requested) return; // check again after the delay
+
         let streamConfig;
         let streamSource;
 
@@ -46,7 +56,7 @@ class AppStream extends Component {
                 videoElementId: 'remote-video',
                 audioElementId: 'remote-audio',
                 authenticate: true,
-                maxReconnects: 20,
+                maxReconnects: 0,
                 signalingServer: StreamConfig.local.server,
                 signalingPort: StreamConfig.local.signalingPort,
                 mediaServer: StreamConfig.local.server,
