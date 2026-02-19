@@ -374,8 +374,8 @@ select option {
 /* :hover/:focus on <option> elements is not supported in most browsers;
    :checked styles the currently selected item where the browser allows it. */
 select option:checked {
-  background-color: rgba(134, 239, 71, 0.20);
-  color: var(--accent-green);
+  background-color: #00318a;
+  color: #ffffff;
 }
 
 input[type="text"]:focus,

@@ -17,66 +17,71 @@ class AppStream extends Component {
     componentDidMount() {
         if (!this._requested) {
             this._requested = true;
+            this._startStream();
+        }
+    }
 
-            // Ensure the singleton is fully stopped before (re)connecting.
-            // This is safe to call even when not yet connected.
-            // The real library may return a rejected Promise (not just throw synchronously),
-            // so we must also handle the async rejection to prevent unhandled rejection errors.
-            try {
-                const stopResult = AppStreamer.stop();
-                if (stopResult && typeof stopResult.catch === 'function') {
-                    stopResult.catch((error) => console.warn('AppStreamer.stop() before connect failed:', error));
-                }
-            } catch (error) {
-                console.warn('AppStreamer.stop() before connect failed:', error);
+    async _startStream() {
+        // Wait for any previous session to fully stop on the server before connecting.
+        // Calling connect() while the server is still tearing down causes NVST_R_BUSY.
+        try {
+            const stopResult = AppStreamer.stop();
+            if (stopResult && typeof stopResult.then === 'function') {
+                await stopResult.catch((err) =>
+                    console.warn('AppStreamer.stop() before connect:', err)
+                );
             }
+        } catch (error) {
+            console.warn('AppStreamer.stop() before connect failed:', error);
+        }
 
-            let streamConfig;
-            let streamSource;
+        if (!this._requested) return; // component was unmounted while stopping
 
-            if (StreamConfig.source === 'local') {
-                streamSource = StreamType.DIRECT;
-                streamConfig = {
-                    videoElementId: 'remote-video',
-                    audioElementId: 'remote-audio',
-                    authenticate: true,
-                    maxReconnects: 20,
-                    signalingServer: StreamConfig.local.server,
-                    signalingPort: StreamConfig.local.signalingPort,
-                    mediaServer: StreamConfig.local.server,
-                    ...(StreamConfig.local.mediaPort != null && { mediaPort: StreamConfig.local.mediaPort }),
-                    nativeTouchEvents: true,
-                    width: 1920,
-                    height: 1080,
-                    fps: 60,
-                    onUpdate: (message) => this._onUpdate(message),
-                    onStart: (message) => this._onStart(message),
-                    onCustomEvent: (message) => this._onCustomEvent(message),
-                    onStop: (message) => { console.log('Stream stopped:', message) },
-                    onTerminate: (message) => { console.log('Stream terminated:', message) }
-                };
-            } else {
-                console.error(`Unknown or unsupported stream source: ${StreamConfig.source}`);
-                return;
-            }
+        let streamConfig;
+        let streamSource;
 
-            try {
-                const streamProps = { streamConfig, streamSource };
-                AppStreamer.connect(streamProps)
-                    .then((result) => {
-                        console.info('AppStreamer connected:', result);
-                    })
-                    .catch((error) => {
-                        console.error('AppStreamer connection error:', error);
-                        if (this.props.onStreamFailed) {
-                            this.props.onStreamFailed();
-                        }
-                    });
-            } catch (error) {
-                console.error('Error initializing AppStreamer:', error);
-                if (this.props.onStreamFailed) {
-                    this.props.onStreamFailed();
-                }
+        if (StreamConfig.source === 'local') {
+            streamSource = StreamType.DIRECT;
+            streamConfig = {
+                videoElementId: 'remote-video',
+                audioElementId: 'remote-audio',
+                authenticate: true,
+                maxReconnects: 20,
+                signalingServer: StreamConfig.local.server,
+                signalingPort: StreamConfig.local.signalingPort,
+                mediaServer: StreamConfig.local.server,
+                ...(StreamConfig.local.mediaPort != null && { mediaPort: StreamConfig.local.mediaPort }),
+                nativeTouchEvents: true,
+                width: 1920,
+                height: 1080,
+                fps: 60,
+                onUpdate: (message) => this._onUpdate(message),
+                onStart: (message) => this._onStart(message),
+                onCustomEvent: (message) => this._onCustomEvent(message),
+                onStop: (message) => { console.log('Stream stopped:', message); },
+                onTerminate: (message) => { console.log('Stream terminated:', message); }
+            };
+        } else {
+            console.error(`Unknown or unsupported stream source: ${StreamConfig.source}`);
+            return;
+        }
+
+        try {
+            const streamProps = { streamConfig, streamSource };
+            AppStreamer.connect(streamProps)
+                .then((result) => {
+                    console.info('AppStreamer connected:', result);
+                })
+                .catch((error) => {
+                    console.error('AppStreamer connection error:', error);
+                    if (this._requested && this.props.onStreamFailed) {
+                        this.props.onStreamFailed();
+                    }
+                });
+        } catch (error) {
+            console.error('Error initializing AppStreamer:', error);
+            if (this._requested && this.props.onStreamFailed) {
+                this.props.onStreamFailed();
             }
         }
     }
@@ -94,6 +99,7 @@ class AppStream extends Component {
     }
 
     componentWillUnmount() {
+        this._requested = false; // allow _startStream to bail if stop() completes after unmount
         try {
             const stopResult = AppStreamer.stop();
             if (stopResult && typeof stopResult.catch === 'function') {
