@@ -127,9 +127,8 @@ export default function App() {
 
   // Legend state
   const [legendOpen, setLegendOpen] = useState(false);
-  // TODO: Add UI controls to change legend variable and color preset
-  const legendVar = "temperature";
-  const legendPreset = "turbo";
+  const [legendVar, setLegendVar] = useState("temperature");
+  const [legendPreset, setLegendPreset] = useState("turbo");
 
   const legendVarObj =
     LEGEND_VARIABLES.find((v) => v.id === legendVar) || LEGEND_VARIABLES[0];
@@ -239,7 +238,17 @@ export default function App() {
       case "Geometrical Design":
         return <GeometricalDesign bridge={bridge} />;
       case "Results Visualization":
-        return <ResultsVisualization />;
+        return (
+          <ResultsVisualization
+            bridge={bridge}
+            legendVar={legendVar}
+            setLegendVar={setLegendVar}
+            legendPreset={legendPreset}
+            setLegendPreset={setLegendPreset}
+            legendVariables={LEGEND_VARIABLES}
+            legendPresets={LEGEND_PRESETS}
+          />
+        );
       case "Plotting":
         return (
           <Plotting
