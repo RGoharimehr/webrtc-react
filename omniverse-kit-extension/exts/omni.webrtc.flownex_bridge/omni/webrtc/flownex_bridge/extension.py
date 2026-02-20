@@ -4,24 +4,29 @@
 # ────────────────────────────────────────────────
 # Bridges the web dashboard and the USD stage.
 #
-# Supported message protocol (JSON over the Omniverse streaming channel):
+# Supported message protocol (NVIDIA Omniverse WebRTC messaging spec):
+# ALL messages use: { "event_type": "...", "payload": { ...data... } }
 #
 # Browser → Kit
 # ─────────────
 #   {
-#     "type":      "get_prim_property",
-#     "prim_path": "/World/MyPrim",   ← optional: empty/absent → Kit picks at (pick.x, pick.y)
-#     "property":  "flownex:componentName",
-#     "pick":      { "x": 0.42, "y": 0.61 }   ← normalised 0-1 coords (used when prim_path is empty)
+#     "event_type": "get_prim_property",
+#     "payload": {
+#       "prim_path": "/World/MyPrim",   ← optional: empty/absent → Kit picks at (pick.x, pick.y)
+#       "property":  "flownex:componentName",
+#       "pick":      { "x": 0.42, "y": 0.61 }   ← normalised 0-1 coords (used when prim_path is empty)
+#     }
 #   }
 #
 # Kit → Browser
 # ─────────────
 #   {
-#     "type":      "prim_property_result",
-#     "prim_path": "/World/MyPrim",
-#     "property":  "flownex:componentName",
-#     "value":     "Pump_01"          ← null when prim / attribute not found
+#     "event_type": "prim_property_result",
+#     "payload": {
+#       "prim_path": "/World/MyPrim",
+#       "property":  "flownex:componentName",
+#       "value":     "Pump_01"          ← null when prim / attribute not found
+#     }
 #   }
 from __future__ import annotations
 
@@ -282,29 +287,30 @@ class FlownexBridgeExtension(omni.ext.IExt):
         if isinstance(raw, (str, bytes)):
             try:
                 msg = json.loads(raw)
-                log.info("FlownexBridge: message parsed OK, event_type=%s type=%s",
-                         msg.get("event_type"), msg.get("type"))
+                log.info("FlownexBridge: message parsed OK, event_type=%s",
+                         msg.get("event_type"))
             except json.JSONDecodeError as exc:
                 log.warning("FlownexBridge: JSON decode error — %s — raw was: %r", exc, raw)
                 return
         elif isinstance(raw, dict):
             msg = raw
-            log.info("FlownexBridge: message already a dict, event_type=%s type=%s",
-                     msg.get("event_type"), msg.get("type"))
+            log.info("FlownexBridge: message already a dict, event_type=%s",
+                     msg.get("event_type"))
         else:
             log.warning("FlownexBridge: unexpected raw type %s — ignoring", type(raw).__name__)
             return
 
-        # Accept both "event_type" (Omniverse routing field) and "type" (protocol spec field)
-        msg_type = msg.get("event_type") or msg.get("type")
+        # Route by event_type per the NVIDIA Omniverse WebRTC messaging spec
+        msg_type = msg.get("event_type")
         if msg_type != "get_prim_property":
-            log.info("FlownexBridge: ignoring msg_type=%r (event_type=%r, type=%r)",
-                     msg_type, msg.get("event_type"), msg.get("type"))
+            log.info("FlownexBridge: ignoring event_type=%r", msg_type)
             return
 
-        prim_path: str = msg.get("prim_path") or ""
-        attr_name: str = msg.get("property") or ""
-        pick_coords: dict = msg.get("pick") or {}
+        # All data is inside the payload object per the NVIDIA spec
+        payload: dict = msg.get("payload") or {}
+        prim_path: str = payload.get("prim_path") or ""
+        attr_name: str = payload.get("property") or ""
+        pick_coords: dict = payload.get("pick") or {}
 
         log.info(
             "FlownexBridge: get_prim_property — prim_path=%r, property=%r, pick=%r",
@@ -313,7 +319,7 @@ class FlownexBridgeExtension(omni.ext.IExt):
 
         # Validate required field
         if not attr_name:
-            log.warning("FlownexBridge: 'property' field missing — cannot query")
+            log.warning("FlownexBridge: 'property' field missing in payload — cannot query")
             return
 
         # Resolve prim_path via viewport pick when it was not supplied
@@ -328,10 +334,11 @@ class FlownexBridgeExtension(omni.ext.IExt):
             log.info("FlownexBridge: prim_path still empty after pick — sending null result")
             _send_message_to_web({
                 "event_type": "prim_property_result",
-                "type":       "prim_property_result",
-                "prim_path":  "",
-                "property":   attr_name,
-                "value":      None,
+                "payload": {
+                    "prim_path": "",
+                    "property":  attr_name,
+                    "value":     None,
+                },
             })
             return
 
@@ -340,11 +347,12 @@ class FlownexBridgeExtension(omni.ext.IExt):
         log.info("FlownexBridge: attribute value = %r", value)
 
         response = {
-            "event_type": "prim_property_result",   # Omniverse routing field
-            "type":       "prim_property_result",   # protocol spec field / browser fallback
-            "prim_path":  prim_path,
-            "property":   attr_name,
-            "value":      value,
+            "event_type": "prim_property_result",
+            "payload": {
+                "prim_path": prim_path,
+                "property":  attr_name,
+                "value":     value,
+            },
         }
         log.info("FlownexBridge: sending response: %r", response)
         _send_message_to_web(response)

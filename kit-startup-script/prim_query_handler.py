@@ -26,21 +26,28 @@
 #  • This script IS that Python code.  Paste it once, run it once — the
 #    handler is registered and will answer every query for the session.
 #
-# Protocol recap
-# ──────────────
-# Browser → Kit (you send this from the web app):
-#   { "event_type": "get_prim_property",
-#     "type":       "get_prim_property",
-#     "prim_path":  "",
-#     "property":   "flownex:componentName",
-#     "pick":       { "x": 0.42, "y": 0.61 } }
+# Protocol (NVIDIA Omniverse WebRTC messaging spec)
+# ─────────────────────────────────────────────────
+# ALL messages use: { "event_type": "...", "payload": { ...data... } }
+# event_type is the routing key; all data lives inside payload.
 #
-# Kit → Browser (you receive this in onCustomEvent):
+# Browser → Kit:
+#   { "event_type": "get_prim_property",
+#     "payload": {
+#       "prim_path":  "",
+#       "property":   "flownex:componentName",
+#       "pick":       { "x": 0.42, "y": 0.61 }
+#     }
+#   }
+#
+# Kit → Browser:
 #   { "event_type": "prim_property_result",
-#     "type":       "prim_property_result",
-#     "prim_path":  "/World/DataCenter/Rack/Pump_01",
-#     "property":   "flownex:componentName",
-#     "value":      "Pump_01" }
+#     "payload": {
+#       "prim_path":  "/World/DataCenter/Rack/Pump_01",
+#       "property":   "flownex:componentName",
+#       "value":      "Pump_01"
+#     }
+#   }
 # ──────────────────────────────────────────────────────────────────────────
 
 import json
@@ -144,13 +151,15 @@ def _on_message(raw):
         return
 
     # Only handle our message type
-    msg_type = msg.get("event_type") or msg.get("type")
+    msg_type = msg.get("event_type")
     if msg_type != "get_prim_property":
         return
 
-    prim_path  = msg.get("prim_path") or ""
-    attr_name  = msg.get("property")  or ""
-    pick       = msg.get("pick")      or {}
+    # Per the NVIDIA spec all data is inside the payload object
+    payload    = msg.get("payload") or {}
+    prim_path  = payload.get("prim_path") or ""
+    attr_name  = payload.get("property")  or ""
+    pick       = payload.get("pick")      or {}
 
     log.info("prim_handler: get_prim_property  prim_path=%r  property=%r  pick=%r",
              prim_path, attr_name, pick)
@@ -172,10 +181,11 @@ def _on_message(raw):
 
     _send_to_web({
         "event_type": "prim_property_result",
-        "type":       "prim_property_result",
-        "prim_path":  prim_path,
-        "property":   attr_name,
-        "value":      value,
+        "payload": {
+            "prim_path": prim_path,
+            "property":  attr_name,
+            "value":     value,
+        },
     })
 
 

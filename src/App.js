@@ -308,15 +308,16 @@ export default function App() {
       setHoldRing({ visible: false, x: 0, y: 0, pct: 0 });
 
       // Send property query to Omniverse Kit extension.
-      // IMPORTANT: the Omniverse streaming library routes custom messages by the
-      // "event_type" field, so we must include it.  "type" is kept for protocol
-      // documentation consistency and for the Kit extension's own filter.
+      // Per the NVIDIA Omniverse WebRTC streaming library spec, messages must use:
+      //   { event_type: "...", payload: { ...data... } }
+      // event_type is the routing key; all data goes inside payload.
       const queryMsg = JSON.stringify({
-        event_type: "get_prim_property",   // ← routing key used by omni.kit.livestream.messaging
-        type:       "get_prim_property",   // ← kept for spec / Kit-side fallback
-        prim_path: "",
-        property: "flownex:componentName",
-        pick: { x: nx, y: ny },
+        event_type: "get_prim_property",
+        payload: {
+          prim_path: "",
+          property: "flownex:componentName",
+          pick: { x: nx, y: ny },
+        },
       });
 
       if (streamMode === "omniverse") {
@@ -381,24 +382,23 @@ export default function App() {
   }, [cancelHold]);
 
   // Handle custom events coming back from the Omniverse Kit extension.
+  // Per the NVIDIA spec, the library delivers: { event_type: "...", payload: { ...data... } }
   // The Kit extension responds to "get_prim_property" with "prim_property_result".
-  // The Omniverse streaming library delivers the response object to onCustomEvent;
-  // Kit may use event_type or type as the discriminator — we check both.
   const handleCustomEvent = useCallback((event) => {
     console.log("[PrimQuery] handleCustomEvent fired — raw event:", event);
     if (!event) {
       console.warn("[PrimQuery] handleCustomEvent called with null/undefined — ignoring");
       return;
     }
-    // Accept both event_type (Omniverse routing field) and type (spec field)
-    const msgType = event.event_type ?? event.type ?? null;
-    if (msgType !== "prim_property_result") {
-      console.log("[PrimQuery] handleCustomEvent — ignoring msgType:", msgType, "(event_type:", event.event_type, ", type:", event.type, ")");
+    if (event.event_type !== "prim_property_result") {
+      console.log("[PrimQuery] handleCustomEvent — ignoring event_type:", event.event_type);
       return;
     }
-    const primPath = event.prim_path ?? null;
-    const property = event.property ?? null;
-    const value    = event.value !== undefined ? event.value : null;
+    // All data is inside the payload object per the NVIDIA messaging spec
+    const payload  = event.payload || {};
+    const primPath = payload.prim_path ?? null;
+    const property = payload.property  ?? null;
+    const value    = payload.value !== undefined ? payload.value : null;
     console.log("[PrimQuery] prim_property_result received — primPath:", primPath, "property:", property, "value:", value);
     // Clear the no-response timeout since Kit answered
     if (queryTimeoutRef.current) {

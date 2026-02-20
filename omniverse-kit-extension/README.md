@@ -83,39 +83,40 @@ path = "${app}/../../../omniverse-kit-extension/exts"
 ```json
 {
   "event_type": "get_prim_property",
-  "type":       "get_prim_property",
-  "prim_path":  "",
-  "property":   "flownex:componentName",
-  "pick":       { "x": 0.42, "y": 0.61 }
+  "payload": {
+    "prim_path": "",
+    "property":  "flownex:componentName",
+    "pick":      { "x": 0.42, "y": 0.61 }
+  }
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `event_type` | string | Omniverse routing key — **required** for Kit to dispatch the message |
-| `type` | string | Protocol label — kept for documentation and Kit-side fallback |
-| `prim_path` | string | USD prim path.  **Leave empty** and set `pick` for coordinate-based lookup |
-| `property` | string | USD attribute name (e.g. `"flownex:componentName"`) |
-| `pick` | object | Normalised viewport coordinates (0–1) used when `prim_path` is empty |
+| `event_type` | string | Omniverse routing key — **required**, must be `"get_prim_property"` |
+| `payload.prim_path` | string | USD prim path. **Leave empty** and set `pick` for coordinate-based lookup |
+| `payload.property` | string | USD attribute name (e.g. `"flownex:componentName"`) |
+| `payload.pick` | object | Normalised viewport coordinates (0–1) used when `prim_path` is empty |
 
 ### Kit → Browser
 
 ```json
 {
   "event_type": "prim_property_result",
-  "type":       "prim_property_result",
-  "prim_path":  "/World/DataCenter/Rack_A/Pump_01",
-  "property":   "flownex:componentName",
-  "value":      "Pump_01"
+  "payload": {
+    "prim_path": "/World/DataCenter/Rack_A/Pump_01",
+    "property":  "flownex:componentName",
+    "value":     "Pump_01"
+  }
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
 | `event_type` | string | `"prim_property_result"` |
-| `prim_path` | string | Resolved USD prim path |
-| `property` | string | The attribute that was queried |
-| `value` | any | Attribute value (`null` when not found) |
+| `payload.prim_path` | string | Resolved USD prim path |
+| `payload.property` | string | The attribute that was queried |
+| `payload.value` | any | Attribute value (`null` when not found) |
 
 ---
 
