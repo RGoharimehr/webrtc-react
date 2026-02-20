@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./App.css";
 import { useBridge } from "./bridge/useBridge";
 import { LEGEND_VARIABLES, LEGEND_PRESETS } from "./simulationEnv";
@@ -14,6 +14,7 @@ import CFDAnalysis from "./tabs/CFDAnalysis";
 import GraphsPanel from "./components/GraphsPanel";
 import DraggableResizable from "./components/DraggableResizable";
 import AppStream from "./components/AppStream";
+import PrimInfoHud from "./components/PrimInfoHud";
 
 /* =========================
    Mode and Tab Configuration
@@ -32,6 +33,38 @@ const MODE_TABS = {
   BUILD: ["Configuration", "Results Mapping"],
 };
 
+// ── Prim Info HUD constants ────────────────────────────────────────────────
+const HOLD_DURATION_MS = 1000;          // ms user must hold to trigger query
+const HOLD_MOVE_THRESHOLD_SQ = 64;      // cancel hold if cursor moves >8 px (8² = 64)
+// ─────────────────────────────────────────────────────────────────────────
+
+// SVG progress ring rendered while the user is holding the pointer.
+// Extracted to avoid recreating the closure on every render.
+function HoldRing({ x, y, pct }) {
+  const R = 18;
+  const circ = 2 * Math.PI * R;
+  const offset = circ * (1 - pct);
+  const size = R * 2 + 8;
+  return (
+    <svg
+      className="stream-hold-ring"
+      style={{ left: x, top: y }}
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      aria-hidden="true"
+    >
+      <circle className="track"    cx={R + 4} cy={R + 4} r={R} />
+      <circle
+        className="progress"
+        cx={R + 4} cy={R + 4} r={R}
+        strokeDasharray={circ}
+        strokeDashoffset={offset}
+      />
+    </svg>
+  );
+}
+
 export default function App() {
   // ✅ hooks must be INSIDE the component
   const bridge = useBridge();
@@ -49,6 +82,27 @@ export default function App() {
 
   // GraphsPanel API ref for data recording
   const graphsApiRef = useRef(null);
+
+  // ── Prim Info HUD ─────────────────────────────────────────────────────────
+  // Shown when the user holds the pointer on the Omniverse stream for 1 second.
+
+  const [primHud, setPrimHud] = useState({
+    status: "hidden",      // "hidden" | "querying" | "found" | "not_found" | "error"
+    x: 0,
+    y: 0,
+    componentName: null,
+    primPath: null,
+  });
+
+  // Progress ring shown while the user holds (0–1 fraction)
+  const [holdRing, setHoldRing] = useState({ visible: false, x: 0, y: 0, pct: 0 });
+
+  const holdTimerRef     = useRef(null);  // setTimeout handle
+  const holdRafRef       = useRef(null);  // requestAnimationFrame handle
+  const holdStartRef     = useRef(null);  // timestamp of pointer-down
+  const holdQueryPosRef  = useRef({ x: 0, y: 0, normX: 0, normY: 0 });
+  const streamBgRef      = useRef(null);  // ref on the .stream-background div
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Docks
   const [hudExpanded, setHudExpanded] = useState(true);
@@ -174,6 +228,134 @@ export default function App() {
 
   const tabs = MODE_TABS[activeMode];
 
+  // ── Prim Info HUD: hold-detection helpers ─────────────────────────────────
+
+  const cancelHold = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdRafRef.current) {
+      cancelAnimationFrame(holdRafRef.current);
+      holdRafRef.current = null;
+    }
+    holdStartRef.current = null;
+    setHoldRing({ visible: false, x: 0, y: 0, pct: 0 });
+  }, []);
+
+  // Animate the progress ring while the user holds.
+  // holdStartRef / holdQueryPosRef are refs — intentionally not listed as deps.
+  const animateRing = useCallback(() => {
+    if (!holdStartRef.current) return;
+    const elapsed = Date.now() - holdStartRef.current;
+    const pct = Math.min(elapsed / HOLD_DURATION_MS, 1);
+    const { x, y } = holdQueryPosRef.current;
+    setHoldRing({ visible: true, x, y, pct });
+    if (pct < 1) {
+      holdRafRef.current = requestAnimationFrame(animateRing);
+    }
+  }, []); // HOLD_DURATION_MS is a module constant; refs never change identity
+
+  const handleStreamPointerDown = useCallback((e) => {
+    // Only activate for the Omniverse stream (or no stream — dev mode)
+    if (streamMode === "screen") return;
+    // Only primary button
+    if (e.button !== undefined && e.button !== 0) return;
+
+    const rect = (streamBgRef.current || e.currentTarget).getBoundingClientRect();
+    const cx = e.clientX;
+    const cy = e.clientY;
+    const normX = (cx - rect.left)  / rect.width;
+    const normY = (cy - rect.top)   / rect.height;
+
+    holdQueryPosRef.current = { x: cx, y: cy, normX, normY };
+    holdStartRef.current = Date.now();
+
+    // Close any existing HUD
+    setPrimHud({ status: "hidden", x: 0, y: 0, componentName: null, primPath: null });
+
+    // Start progress-ring animation
+    holdRafRef.current = requestAnimationFrame(animateRing);
+
+    // After HOLD_DURATION_MS: show loading state and send query to Omniverse
+    holdTimerRef.current = setTimeout(() => {
+      holdTimerRef.current = null;
+      const { x, y, normX: nx, normY: ny } = holdQueryPosRef.current;
+      setPrimHud({ status: "querying", x, y, componentName: null, primPath: null });
+      setHoldRing({ visible: false, x: 0, y: 0, pct: 0 });
+
+      // Send pick query to Omniverse Kit extension
+      const queryMsg = JSON.stringify({
+        event_type: "query_flownex_component",
+        payload: { x: nx, y: ny },
+      });
+
+      if (streamMode === "omniverse") {
+        AppStream.sendMessage(queryMsg);
+      } else {
+        // Dev/stub mode: simulate a response after a short delay
+        setTimeout(() => {
+          setPrimHud({
+            status: "found",
+            x,
+            y,
+            componentName: "Pump_01 [stub]",
+            primPath: "/World/DataCenter/Rack_A/Pump_01",
+          });
+        }, 600);
+      }
+    }, HOLD_DURATION_MS);
+    // streamMode and animateRing are the only changing deps; refs never change identity
+  }, [streamMode, animateRing]);
+
+  const handleStreamPointerUp = useCallback(() => {
+    // If the timer has already fired we leave the HUD open; just clean up animation.
+    if (holdTimerRef.current) {
+      cancelHold(); // Released before 1 s — cancel everything
+    } else {
+      // Timer already fired — only stop the ring animation
+      if (holdRafRef.current) {
+        cancelAnimationFrame(holdRafRef.current);
+        holdRafRef.current = null;
+      }
+      setHoldRing({ visible: false, x: 0, y: 0, pct: 0 });
+    }
+  }, [cancelHold]);
+
+  const handleStreamPointerMove = useCallback((e) => {
+    if (!holdStartRef.current) return;
+    // Cancel hold if cursor moves more than 8 px in any direction
+    const { x, y } = holdQueryPosRef.current;
+    const dx = e.clientX - x;
+    const dy = e.clientY - y;
+    if (dx * dx + dy * dy > HOLD_MOVE_THRESHOLD_SQ) {
+      cancelHold();
+    }
+  }, [cancelHold]);
+
+  // Handle custom events coming back from the Omniverse Kit extension
+  const handleCustomEvent = useCallback((event) => {
+    if (!event) return;
+    if (event.event_type === "flownex_component_info") {
+      const payload = event.payload || event.data || {};
+      const componentName =
+        payload["flownex:componentName"] ??
+        payload["flownex_component_name"] ??
+        null;
+      const primPath = payload.prim_path ?? payload.primPath ?? null;
+      setPrimHud((prev) => ({
+        ...prev,
+        status: componentName ? "found" : "not_found",
+        componentName,
+        primPath,
+      }));
+    }
+  }, []);
+
+  // Cleanup hold timer on unmount
+  useEffect(() => () => cancelHold(), [cancelHold]);
+  // ─────────────────────────────────────────────────────────────────────────
+
   const renderTabContent = () => {
     if (activeMode === "AI") {
       return (
@@ -242,8 +424,15 @@ export default function App() {
 
   return (
     <div className="App">
-      {/* Background Stream */}
-      <div className="stream-background">
+      {/* Background Stream — pointer events for prim-info hold gesture */}
+      <div
+        ref={streamBgRef}
+        className="stream-background"
+        onPointerDown={handleStreamPointerDown}
+        onPointerUp={handleStreamPointerUp}
+        onPointerCancel={handleStreamPointerUp}
+        onPointerMove={handleStreamPointerMove}
+      >
         {isStreaming ? (
           streamMode === "omniverse" ? (
             <AppStream
@@ -255,7 +444,7 @@ export default function App() {
                 setStreamMode(null);
               }}
               onLoggedIn={(userId) => console.log("Logged in:", userId)}
-              handleCustomEvent={(event) => console.log("Custom event:", event)}
+              handleCustomEvent={handleCustomEvent}
             />
           ) : (
             <video ref={videoRef} autoPlay playsInline muted className="stream-video" />
@@ -493,6 +682,23 @@ export default function App() {
           <span className="kms-value">N/A</span>
         </div>
       </div>
+
+      {/* ── Hold-progress ring ── */}
+      {holdRing.visible && (
+        <HoldRing x={holdRing.x} y={holdRing.y} pct={holdRing.pct} />
+      )}
+
+      {/* ── Prim Info HUD ── */}
+      <PrimInfoHud
+        x={primHud.x}
+        y={primHud.y}
+        status={primHud.status}
+        componentName={primHud.componentName}
+        primPath={primHud.primPath}
+        onClose={() =>
+          setPrimHud({ status: "hidden", x: 0, y: 0, componentName: null, primPath: null })
+        }
+      />
     </div>
   );
 }
