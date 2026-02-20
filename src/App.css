@@ -1229,52 +1229,6 @@ button.warning:hover {
 
 .prim-info-error { color: var(--error-red); }
 
-.prim-info-error strong {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 12px;
-}
-
-.prim-info-error p {
-  margin: 0 0 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.prim-info-error ul {
-  margin: 0;
-  padding-left: 16px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.prim-info-error ul li {
-  margin-bottom: 3px;
-}
-
-.prim-info-error code {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  padding: 1px 4px;
-  font-size: 10px;
-  font-family: 'Menlo', 'Consolas', monospace;
-  color: rgba(134, 239, 71, 0.75);
-}
-
-.prim-info-demo-btn {
-  margin-top: 8px;
-  padding: 4px 10px;
-  background: rgba(134, 239, 71, 0.15);
-  border: 1px solid rgba(134, 239, 71, 0.35);
-  border-radius: 4px;
-  color: rgba(134, 239, 71, 0.9);
-  font-size: 11px;
-  cursor: pointer;
-}
-.prim-info-demo-btn:hover {
-  background: rgba(134, 239, 71, 0.25);
-}
-
 .prim-info-none code {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 4px;

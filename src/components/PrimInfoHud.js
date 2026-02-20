@@ -13,14 +13,14 @@
 // onClose   func     Called when the × button is pressed
 import React from "react";
 
-const PrimInfoHud = ({ x, y, status, property, value, primPath, onClose, onDemoMode }) => {
+const PrimInfoHud = ({ x, y, status, property, value, primPath, onClose }) => {
   if (status === "hidden") return null;
 
   // Keep the HUD within the viewport: nudge left/up if too close to the edge.
   const OFFSET_X = 16;
   const OFFSET_Y = 10;
-  const HUD_W = 270;
-  const HUD_H = status === "error" ? 155 : 110;
+  const HUD_W = 260;
+  const HUD_H = 110;
 
   const left = Math.min(x + OFFSET_X, window.innerWidth  - HUD_W - 8);
   const top  = Math.min(y + OFFSET_Y, window.innerHeight - HUD_H - 8);
@@ -65,17 +65,7 @@ const PrimInfoHud = ({ x, y, status, property, value, primPath, onClose, onDemoM
 
         {status === "error" && (
           <div className="prim-info-error">
-            <strong>Kit did not respond</strong>
-            <p>
-              USD attributes live inside the Kit process. Paste{" "}
-              <code>kit-startup-script/prim_query_handler.py</code> into Kit's
-              Script&nbsp;Editor and press&nbsp;▶ to enable this feature.
-            </p>
-            {onDemoMode && (
-              <button className="prim-info-demo-btn" onClick={onDemoMode}>
-                Try demo data
-              </button>
-            )}
+            Query failed — check Omniverse Kit extension.
           </div>
         )}
 

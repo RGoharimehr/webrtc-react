@@ -894,32 +894,9 @@ The app can display a live 3-D scene rendered by NVIDIA Omniverse as the video b
 
 4. Click **▶ Connect Omniverse Stream** in the dashboard header.
 
-### Enabling the "Thermofluidic Info" HUD (hold I + click-hold on stream)
+When the stream is running, the **Results Visualization** tab's "Apply to Omniverse" button sends colour-map commands to the Kit extension via `AppStream.sendMessage()`. Implement the `on_message` handler in your Kit extension to receive these.
 
-When the user holds the **I** key and click-holds on the stream for 1 second, the HUD queries a USD attribute from the hovered prim.  For this to work, a small piece of Python must run **inside Kit** — here is why, and how to make it work in 30 seconds:
-
-**Why does anything need to run in Kit?**
-
-```
-Browser (JavaScript)            Omniverse Kit (Python / C++)
-────────────────────            ────────────────────────────
-React dashboard           ◄──► USD stage (live in memory)
-                video stream    prim attributes, scene graph
-                JSON messages
-```
-
-The WebRTC streaming library is only a relay — it passes JSON between browser and Kit, but it has no USD awareness.  USD attributes live inside Kit's C++/Python process; the only way to read them is Python code running *inside* Kit.  This is a hard process boundary, not optional complexity.
-
-**The easiest way — no installation required:**
-
-1. Open **Window → Script Editor** in your Kit application.
-2. Copy the contents of [`kit-startup-script/prim_query_handler.py`](kit-startup-script/prim_query_handler.py).
-3. Paste and click **Run ▶**.
-4. You will see: `✅  prim_query_handler registered`
-
-The handler stays active for the Kit session.  See [`omniverse-kit-extension/README.md`](omniverse-kit-extension/README.md) for a persistent auto-loading extension option.
-
-### Using the real NVIDIA library
+#### Using the real NVIDIA library
 
 The app ships with a local stub (`src/lib/omniverse-webrtc-stub.js`). To use the real library:
 
