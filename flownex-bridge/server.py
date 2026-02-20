@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from state import BridgeState
 from adapters.flownex_direct import FlownexDirectAdapter
+from adapters.ansys_stub import AnsysStubAdapter
+from adapters.omniverse_stub import OmniverseStubAdapter
 
 app = FastAPI()
 
@@ -29,6 +31,17 @@ app.add_middleware(
 
 state = BridgeState()
 adapter = FlownexDirectAdapter()
+
+
+def _make_adapter(backend: str):
+    """Return the adapter instance for the requested backend name."""
+    backend = (backend or "flownex").lower().strip()
+    if backend == "ansys":
+        return AnsysStubAdapter()
+    if backend == "omniverse":
+        return OmniverseStubAdapter()
+    # default / "flownex" / "generic"
+    return FlownexDirectAdapter()
 
 
 def _set_status(s: str, msg: str, progress: float = 0.0) -> None:
@@ -52,6 +65,9 @@ def health():
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
 
+    # Each connection gets its own adapter instance (starts with default)
+    local_adapter = FlownexDirectAdapter()
+
     # send initial state (even if empty)
     await _safe_send(ws, {"type": "state", "payload": state.state_dict()})
     await _safe_send(ws, {"type": "schema", "payload": state.schema_dict()})
@@ -64,11 +80,16 @@ async def ws_endpoint(ws: WebSocket):
             mid = msg.get("id")
 
             # -----------------------------
-            # CONFIGURE: projectPath + ioDir
+            # CONFIGURE: projectPath + ioDir + backend
             # -----------------------------
             if mtype == "configure":
                 project_path = payload.get("projectPath") or ""
                 io_dir = payload.get("ioDir") or ""
+                backend = payload.get("backend") or "flownex"
+
+                # switch adapter when backend selection changes
+                local_adapter = _make_adapter(backend)
+                state.backend = backend
 
                 # build inputs/outputs schema paths from io_dir
                 inputs_csv = os.path.join(io_dir, "Inputs.csv")
@@ -108,7 +129,7 @@ async def ws_endpoint(ws: WebSocket):
                     _set_status("running", "Opening Flownex project...", 0.2)
                     await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
 
-                    adapter.open_project(state.connected_project)
+                    local_adapter.open_project(state.connected_project)
 
                     _set_status("idle", "Project opened", 1.0)
                     await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
@@ -127,7 +148,7 @@ async def ws_endpoint(ws: WebSocket):
                     _set_status("running", "Closing project...", 0.2)
                     await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
 
-                    adapter.close_project()
+                    local_adapter.close_project()
 
                     _set_status("idle", "Project closed", 1.0)
                     await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
@@ -139,21 +160,22 @@ async def ws_endpoint(ws: WebSocket):
                 continue
 
             # -----------------------------
-            # CLOSE FLOWNEX APP
+            # CLOSE APP (generic alias for close_flownex / close_app)
             # -----------------------------
-            if mtype == "close_flownex":
+            if mtype in ("close_flownex", "close_app"):
                 try:
-                    _set_status("running", "Closing Flownex...", 0.2)
+                    app_label = getattr(state, "backend", "app").capitalize()
+                    _set_status("running", f"Closing {app_label}...", 0.2)
                     await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
 
-                    adapter.close_flownex()
+                    local_adapter.close_app()
 
-                    _set_status("idle", "Flownex closed", 1.0)
+                    _set_status("idle", f"{app_label} closed", 1.0)
                     await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
                     await _safe_send(ws, {"type": "state", "payload": state.state_dict()})
 
                 except Exception as e:
-                    _set_status("error", f"Close Flownex failed: {e}", 0.0)
+                    _set_status("error", f"Close app failed: {e}", 0.0)
                     await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
                 continue
 
@@ -178,7 +200,7 @@ async def ws_endpoint(ws: WebSocket):
                     if idef is None:
                         raise KeyError(f"Unknown input key: {k2}")
 
-                    adapter.set_property(
+                    local_adapter.set_property(
                         component_identifier=idef.componentIdentifier,
                         property_identifier=idef.propertyIdentifier,
                         value=v2,
@@ -208,10 +230,10 @@ async def ws_endpoint(ws: WebSocket):
                     _set_status("running", "Running steady solve...", 0.1)
                     await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
 
-                    adapter.solve_steady()
+                    local_adapter.solve_steady()
 
                     # read outputs back and publish
-                    out_map = adapter.read_outputs(state.outputs_def)
+                    out_map = local_adapter.read_outputs(state.outputs_def)
                     for ok, ov in out_map.items():
                         state.set_output(ok, ov)
 
@@ -231,6 +253,22 @@ async def ws_endpoint(ws: WebSocket):
             if mtype == "get_state":
                 await _safe_send(ws, {"type": "state", "payload": state.state_dict()})
                 await _safe_send(ws, {"type": "schema", "payload": state.schema_dict()})
+                continue
+
+            # -----------------------------
+            # CUSTOM MESSAGE (for user-loaded scripts)
+            # -----------------------------
+            if mtype == "custom_msg":
+                try:
+                    custom_type = payload.get("msgType") or "unknown"
+                    custom_payload = payload.get("payload") or {}
+                    result = local_adapter.send_custom(custom_type, custom_payload)
+                    await _safe_send(ws, {"type": "custom_response", "payload": result})
+                except Exception as e:
+                    await _safe_send(ws, {
+                        "type": "custom_response",
+                        "payload": {"ok": False, "error": str(e)},
+                    })
                 continue
 
             # Unknown message type

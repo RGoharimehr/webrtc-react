@@ -1,13 +1,26 @@
 // src/tabs/Configuration.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+const BACKENDS = [
+  { id: "flownex", label: "Flownex" },
+  { id: "ansys", label: "Ansys" },
+  { id: "omniverse", label: "NVIDIA Omniverse" },
+  { id: "generic", label: "Generic / Custom" },
+];
+
 const Configuration = ({ bridge }) => {
   const [config, setConfig] = useState({
     projectFile: "",
     ioDirectory: "",
+    backend: "flownex",
     solveOnChange: true,
     dataInterval: 0.5,
   });
+
+  // Custom extensions state
+  const [jsUrls, setJsUrls] = useState("");
+  const [cssUrls, setCssUrls] = useState("");
+  const [extLog, setExtLog] = useState("");
 
   const [logs, setLogs] = useState("Configuration panel ready.\n");
 
@@ -22,6 +35,9 @@ const Configuration = ({ bridge }) => {
       return lines.join("\n") + `[${timestamp}] ${message}\n`;
     });
   };
+
+  const addExtLog = (msg) =>
+    setExtLog((p) => p + `[${new Date().toLocaleTimeString()}] ${msg}\n`);
 
   const status = bridge?.state?.status;
   const statusText = useMemo(() => {
@@ -64,9 +80,9 @@ const Configuration = ({ bridge }) => {
 
   // ---- bridge calls ----
   const applyConfigure = () => {
-    addLog("Sending configure(projectPath, ioDir) to bridge...");
+    addLog(`Sending configure(projectPath, ioDir, backend="${config.backend}") to bridge...`);
     try {
-      bridge?.configure?.(config.projectFile, config.ioDirectory);
+      bridge?.configure?.(config.projectFile, config.ioDirectory, config.backend);
     } catch (e) {
       addLog(`Bridge configure failed: ${e?.message || e}`);
     }
@@ -76,7 +92,7 @@ const Configuration = ({ bridge }) => {
     addLog("Open Project requested...");
     try {
       // safest: configure first so backend has paths + schema loaded
-      bridge?.configure?.(config.projectFile, config.ioDirectory);
+      bridge?.configure?.(config.projectFile, config.ioDirectory, config.backend);
       bridge?.openProject?.();
     } catch (e) {
       addLog(`Open Project failed: ${e?.message || e}`);
@@ -93,11 +109,59 @@ const Configuration = ({ bridge }) => {
   };
 
   const closeFlownex = () => {
-    addLog("Close Flownex requested...");
+    const label = BACKENDS.find((b) => b.id === config.backend)?.label || "App";
+    addLog(`Close ${label} requested...`);
     try {
       bridge?.closeFlownex?.();
     } catch (e) {
-      addLog(`Close Flownex failed: ${e?.message || e}`);
+      addLog(`Close App failed: ${e?.message || e}`);
+    }
+  };
+
+  // ---- custom extensions ----
+  const loadExtensions = () => {
+    const parseUrls = (raw) =>
+      raw
+        .split("\n")
+        .map((u) => u.trim())
+        .filter(Boolean);
+
+    // Load CSS files
+    parseUrls(cssUrls).forEach((url) => {
+      const escapedUrl = CSS.escape(url);
+      if (document.querySelector(`link[data-custom-ext][href="${escapedUrl}"]`)) {
+        addExtLog(`CSS already loaded: ${url}`);
+        return;
+      }
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = url;
+      link.setAttribute("data-custom-ext", "true");
+      link.onload = () => addExtLog(`CSS loaded: ${url}`);
+      link.onerror = () => addExtLog(`CSS load error: ${url}`);
+      document.head.appendChild(link);
+    });
+
+    // Load JS files — only from trusted origins (same host or explicit user intent)
+    parseUrls(jsUrls).forEach((url) => {
+      const escapedUrl = CSS.escape(url);
+      if (document.querySelector(`script[data-custom-ext][src="${escapedUrl}"]`)) {
+        addExtLog(`JS already loaded: ${url}`);
+        return;
+      }
+      // Security notice: custom scripts run with full page access
+      console.warn("[Custom Extension] Loading user-supplied script:", url,
+        "— ensure this URL is from a trusted source.");
+      const script = document.createElement("script");
+      script.src = url;
+      script.setAttribute("data-custom-ext", "true");
+      script.onload = () => addExtLog(`JS loaded: ${url}`);
+      script.onerror = () => addExtLog(`JS load error: ${url}`);
+      document.head.appendChild(script);
+    });
+
+    if (!jsUrls.trim() && !cssUrls.trim()) {
+      addExtLog("No extension URLs provided.");
     }
   };
 
@@ -111,11 +175,14 @@ const Configuration = ({ bridge }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.state, status?.message, status?.progress]);
 
+  const backendLabel =
+    BACKENDS.find((b) => b.id === config.backend)?.label || "App";
+
   return (
     <div>
       <div className="collapsible">
         <div className="collapsible-header">
-          <span className="collapsible-title">Flownex Configuration</span>
+          <span className="collapsible-title">Simulation Backend Configuration</span>
           <span className="collapsible-icon expanded">▼</span>
         </div>
 
@@ -151,7 +218,20 @@ const Configuration = ({ bridge }) => {
           />
 
           <div className="input-row">
-            <label className="input-label">Flownex Project File:</label>
+            <label className="input-label">Simulation Backend:</label>
+            <select
+              value={config.backend}
+              onChange={(e) => setConfig((p) => ({ ...p, backend: e.target.value }))}
+              style={{ flex: 1 }}
+            >
+              {BACKENDS.map((b) => (
+                <option key={b.id} value={b.id}>{b.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="input-row">
+            <label className="input-label">Project File:</label>
             <div style={{ flex: 1, display: "flex", gap: "8px" }}>
               <input
                 type="text"
@@ -159,7 +239,7 @@ const Configuration = ({ bridge }) => {
                 onChange={(e) =>
                   setConfig((p) => ({ ...p, projectFile: e.target.value }))
                 }
-                placeholder="Paste full path (recommended): D:\Flownex\...\project.proj"
+                placeholder="Paste full path: D:\Simulation\project.proj"
                 style={{ flex: 1 }}
               />
               <button onClick={browseFile}>...</button>
@@ -175,7 +255,7 @@ const Configuration = ({ bridge }) => {
                 onChange={(e) =>
                   setConfig((p) => ({ ...p, ioDirectory: e.target.value }))
                 }
-                placeholder="Paste full path (recommended): D:\Flownex\...\IOFiles"
+                placeholder="Paste full path: D:\Simulation\IOFiles"
                 style={{ flex: 1 }}
               />
               <button onClick={browseFolder}>...</button>
@@ -196,7 +276,7 @@ const Configuration = ({ bridge }) => {
           </div>
 
           <div className="input-row">
-            <label className="input-label">Flownex Data Interval [s]:</label>
+            <label className="input-label">Data Interval [s]:</label>
             <div className="input-control">
               <input
                 type="range"
@@ -227,8 +307,82 @@ const Configuration = ({ bridge }) => {
           <button onClick={openProject}>Open Project</button>
           <button onClick={closeProject}>Close Project</button>
           <button className="warning" onClick={closeFlownex}>
-            Close Flownex
+            Close {backendLabel}
           </button>
+        </div>
+      </div>
+
+      {/* Custom Extensions */}
+      <div className="collapsible">
+        <div className="collapsible-header">
+          <span className="collapsible-title">Custom Extensions</span>
+          <span className="collapsible-icon expanded">▼</span>
+        </div>
+        <div className="collapsible-content">
+          <div style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 10 }}>
+            Load custom <code>.js</code> / <code>.css</code> files hosted on a local or remote
+            server. Loaded scripts have full access to{" "}
+            <code>window.__bridgeAPI</code> — use it to send messages to the
+            active simulation backend (Flownex, Ansys, Omniverse, …).{" "}
+            <span style={{ color: "var(--warning-yellow)" }}>
+              ⚠ Only load scripts from trusted sources.
+            </span>
+          </div>
+
+          <div className="input-row" style={{ alignItems: "flex-start" }}>
+            <label className="input-label" style={{ paddingTop: 4 }}>JS URLs (one per line):</label>
+            <textarea
+              value={jsUrls}
+              onChange={(e) => setJsUrls(e.target.value)}
+              placeholder={"http://localhost:9000/my-extension.js\nhttp://localhost:9000/other.js"}
+              rows={3}
+              style={{ flex: 1, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
+            />
+          </div>
+
+          <div className="input-row" style={{ alignItems: "flex-start" }}>
+            <label className="input-label" style={{ paddingTop: 4 }}>CSS URLs (one per line):</label>
+            <textarea
+              value={cssUrls}
+              onChange={(e) => setCssUrls(e.target.value)}
+              placeholder={"http://localhost:9000/my-styles.css"}
+              rows={2}
+              style={{ flex: 1, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
+            />
+          </div>
+
+          <div className="button-group" style={{ marginTop: 8, marginBottom: 8 }}>
+            <button onClick={loadExtensions}>Load Extensions</button>
+          </div>
+
+          {extLog && (
+            <textarea
+              readOnly
+              value={extLog}
+              rows={4}
+              style={{
+                width: "100%",
+                resize: "vertical",
+                fontFamily: "monospace",
+                fontSize: 11,
+                background: "rgba(0,0,0,0.35)",
+                color: "var(--text-secondary)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8,
+                padding: "6px 8px",
+              }}
+            />
+          )}
+
+          <div style={{ color: "var(--text-secondary)", fontSize: 11, marginTop: 8 }}>
+            <strong>Example custom script usage:</strong>
+            <pre style={{ marginTop: 4, padding: "6px 8px", background: "rgba(0,0,0,0.35)", borderRadius: 6, whiteSpace: "pre-wrap" }}>
+{`// Access bridge from your custom JS file:
+const api = window.__bridgeAPI;
+api.sendCustom("myCommand", { param: 42 });
+api.setInput("dynamic", "Fan_Speed", 1200);`}
+            </pre>
+          </div>
         </div>
       </div>
 

@@ -2,6 +2,8 @@
 from __future__ import annotations
 from typing import Any, Dict
 
+from .base import BaseAdapter
+
 # If pythonnet isn't installed yet, we run in stub mode
 try:
     import clr  # noqa
@@ -10,7 +12,7 @@ except Exception:
     PYTHONNET_OK = False
 
 
-class FlownexDirectAdapter:
+class FlownexDirectAdapter(BaseAdapter):
     """
     Direct adapter to Flownex via pythonnet (.NET).
     This file is SAFE to import even when pythonnet/Flownex is not installed.
@@ -55,6 +57,10 @@ class FlownexDirectAdapter:
 
     def close_flownex(self) -> None:
         """Close the Flownex application"""
+        self.close_app()
+
+    def close_app(self) -> None:
+        """Close the Flownex application (BaseAdapter interface)."""
         # In real mode, quit the Flownex application.
         if PYTHONNET_OK and self._api is not None:
             # TODO: REAL IMPLEMENTATION
@@ -64,6 +70,10 @@ class FlownexDirectAdapter:
         self._api = None
         self._opened = False
         self._project_path = None
+
+    def send_custom(self, msg_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle Flownex-specific custom commands."""
+        return {"ok": True, "backend": "flownex", "echo": {"type": msg_type, "payload": payload}}
 
     def set_property(self, component_identifier: str, property_identifier: str, value: Any) -> None:
         """Set a property value in Flownex"""
