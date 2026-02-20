@@ -36,6 +36,7 @@ const MODE_TABS = {
 // ── Prim Info HUD constants ────────────────────────────────────────────────
 const HOLD_DURATION_MS = 1000;          // ms user must hold to trigger query
 const HOLD_MOVE_THRESHOLD_SQ = 64;      // cancel hold if cursor moves >8 px (8² = 64)
+const QUERY_TIMEOUT_MS = 8000;          // ms to wait for Kit response before showing error
 // ─────────────────────────────────────────────────────────────────────────
 
 // SVG progress ring rendered while the user is holding the pointer.
@@ -104,6 +105,7 @@ export default function App() {
   const holdQueryPosRef  = useRef({ x: 0, y: 0, normX: 0, normY: 0 });
   const streamBgRef      = useRef(null);  // ref on the .stream-background div
   const infoKeyHeldRef   = useRef(false); // true while the "i" key is pressed
+  const queryTimeoutRef  = useRef(null);  // timeout for Kit not responding
   // ─────────────────────────────────────────────────────────────────────────
 
   // Docks
@@ -241,6 +243,10 @@ export default function App() {
       cancelAnimationFrame(holdRafRef.current);
       holdRafRef.current = null;
     }
+    if (queryTimeoutRef.current) {
+      clearTimeout(queryTimeoutRef.current);
+      queryTimeoutRef.current = null;
+    }
     holdStartRef.current = null;
     setHoldRing({ visible: false, x: 0, y: 0, pct: 0 });
   }, []);
@@ -317,6 +323,18 @@ export default function App() {
         console.log("[PrimQuery] Sending get_prim_property to Omniverse Kit:", queryMsg);
         AppStream.sendMessage(queryMsg);
         console.log("[PrimQuery] sendMessage called — waiting for prim_property_result...");
+
+        // Arm a timeout: if Kit doesn't respond within QUERY_TIMEOUT_MS the
+        // HUD flips to "error" so it never spins forever.
+        queryTimeoutRef.current = setTimeout(() => {
+          queryTimeoutRef.current = null;
+          console.warn("[PrimQuery] No response from Kit after " + QUERY_TIMEOUT_MS + " ms — showing error state");
+          setPrimHud((prev) =>
+            prev.status === "querying"
+              ? { ...prev, status: "error", value: null }
+              : prev
+          );
+        }, QUERY_TIMEOUT_MS);
       } else {
         console.log("[PrimQuery] No live stream — using stub response (600 ms delay)");
         // Dev/stub mode: simulate a Kit response after a short delay
@@ -382,6 +400,11 @@ export default function App() {
     const property = event.property ?? null;
     const value    = event.value !== undefined ? event.value : null;
     console.log("[PrimQuery] prim_property_result received — primPath:", primPath, "property:", property, "value:", value);
+    // Clear the no-response timeout since Kit answered
+    if (queryTimeoutRef.current) {
+      clearTimeout(queryTimeoutRef.current);
+      queryTimeoutRef.current = null;
+    }
     setPrimHud((prev) => ({
       ...prev,
       status: value !== null ? "found" : "not_found",

@@ -19,8 +19,8 @@ const PrimInfoHud = ({ x, y, status, property, value, primPath, onClose }) => {
   // Keep the HUD within the viewport: nudge left/up if too close to the edge.
   const OFFSET_X = 16;
   const OFFSET_Y = 10;
-  const HUD_W = 260;
-  const HUD_H = 110;
+  const HUD_W = 270;
+  const HUD_H = status === "error" ? 180 : 110;
 
   const left = Math.min(x + OFFSET_X, window.innerWidth  - HUD_W - 8);
   const top  = Math.min(y + OFFSET_Y, window.innerHeight - HUD_H - 8);
@@ -65,7 +65,12 @@ const PrimInfoHud = ({ x, y, status, property, value, primPath, onClose }) => {
 
         {status === "error" && (
           <div className="prim-info-error">
-            Query failed — check Omniverse Kit extension.
+            <strong>No response from Omniverse Kit</strong>
+            <p>The extension did not reply within 8 s. Check that:</p>
+            <ul>
+              <li><code>omni.webrtc.flownex_bridge</code> is enabled in Kit's Extension Manager</li>
+              <li>The Kit process is running and connected to this session</li>
+            </ul>
           </div>
         )}
 
