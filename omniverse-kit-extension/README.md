@@ -1,35 +1,100 @@
-# Omniverse Kit Extension — `omni.webrtc.flownex_bridge`
+# Omniverse Kit — USD Property Query Handler
 
-This Kit extension bridges the **web dashboard** and the **USD stage** using the Omniverse streaming custom-messaging channel.
-
-## What it does
-
-When the user holds the pointer on the Omniverse stream for 1 second, the web app sends a `get_prim_property` message.  This extension:
-
-1. Receives the message.
-2. If no `prim_path` is provided, performs a viewport pick at the given normalised coordinates to resolve the prim.
-3. Reads the requested USD attribute from the prim.
-4. Sends a `prim_property_result` response back to the browser.
+This folder gives you **two ways** to make the "Thermofluidic Info" HUD work in the web dashboard.  Start with Method 0 — it takes 30 seconds and requires nothing to install.
 
 ---
 
-## Protocol
+## Why does anything need to run in Kit at all?
+
+> "WebRTC is already sending messages to Omniverse — why can't it just pass USD attributes?"
+
+Here is the boundary:
+
+```
+Browser (JavaScript)                    Omniverse Kit (Python / C++)
+────────────────────                    ────────────────────────────
+React dashboard                         USD stage (live, in memory)
+                                        prim attributes, scene graph
+         ◄──── WebRTC video stream ────►
+         ◄──── custom JSON messages ───►
+```
+
+* The **WebRTC streaming library** is only a relay — it moves video and JSON messages between the browser and Kit.  It has no USD awareness.
+* **USD attributes live inside Kit's C++/Python process**.  The only way to read them is to call `stage.GetPrimAtPath(...)` from Python code running *inside* Kit.
+* This is not extra complexity — it is a hard process boundary.  Omniverse intentionally exposes a custom-message channel so you can write exactly this kind of integration without needing any special SDK.
+
+The good news: **you don't need to install anything**.  Kit ships with a Script Editor.  Paste ~30 lines of Python, press Run.  Done.
+
+---
+
+## Method 0 — Kit Script Editor (no installation, recommended for first use)
+
+1. Open **Window → Script Editor** in your Kit application (USD Composer / Code / Isaac Sim / any Kit app).
+
+2. Open [`kit-startup-script/prim_query_handler.py`](../kit-startup-script/prim_query_handler.py) from this repo and copy its entire contents.
+
+3. Paste into the Script Editor and click **Run** (▶).
+
+4. You should see this in the Script Editor output:
+   ```
+   ✅  prim_query_handler registered — hold I + click on the stream to query USD attributes
+   ```
+
+5. Go to the web dashboard, hold **I**, click-hold on a USD object for 1 second → the Thermofluidic Info HUD appears.
+
+> **Session lifetime:** the handler stays registered until Kit is closed or you restart the Script Editor environment.  Re-run the script after each Kit restart, or use Method 1 to make it permanent.
+
+---
+
+## Method 1 — Kit extension (persistent, auto-loads on startup)
+
+Use this when you want the handler to load automatically every time Kit starts.
+
+### Quick setup
+
+1. Copy (or symlink) the `exts/omni.webrtc.flownex_bridge` directory to your Kit shared extensions folder:
+
+   ```
+   Windows:  %USERPROFILE%\Documents\kit\shared\exts\
+   Linux:    ~/Documents/kit/shared/exts/
+   ```
+
+2. Open **Window → Extensions**, search for **"Flownex WebRTC Bridge"**, and click **Enable**.
+
+3. Confirm in the Kit log:
+   ```
+   [INFO] FlownexBridge: startup (ext_id=omni.webrtc.flownex_bridge-1.0.0)
+   [INFO] FlownexBridge: registered via omni.services.streaming.manager ✓
+   ```
+
+### Alternative: add search path to your `.kit` file
+
+```toml
+[[ext_folders]]
+path = "${app}/../../../omniverse-kit-extension/exts"
+```
+
+---
+
+## Protocol reference
 
 ### Browser → Kit
 
 ```json
 {
-  "type":      "get_prim_property",
-  "prim_path": "",
-  "property":  "flownex:componentName",
-  "pick":      { "x": 0.42, "y": 0.61 }
+  "event_type": "get_prim_property",
+  "type":       "get_prim_property",
+  "prim_path":  "",
+  "property":   "flownex:componentName",
+  "pick":       { "x": 0.42, "y": 0.61 }
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `type` | string | Always `"get_prim_property"` |
-| `prim_path` | string | USD prim path.  **Leave empty** and set `pick` for coordinate-based lookup. |
+| `event_type` | string | Omniverse routing key — **required** for Kit to dispatch the message |
+| `type` | string | Protocol label — kept for documentation and Kit-side fallback |
+| `prim_path` | string | USD prim path.  **Leave empty** and set `pick` for coordinate-based lookup |
 | `property` | string | USD attribute name (e.g. `"flownex:componentName"`) |
 | `pick` | object | Normalised viewport coordinates (0–1) used when `prim_path` is empty |
 
@@ -37,79 +102,33 @@ When the user holds the pointer on the Omniverse stream for 1 second, the web ap
 
 ```json
 {
-  "type":      "prim_property_result",
-  "prim_path": "/World/DataCenter/Rack_A/Pump_01",
-  "property":  "flownex:componentName",
-  "value":     "Pump_01"
+  "event_type": "prim_property_result",
+  "type":       "prim_property_result",
+  "prim_path":  "/World/DataCenter/Rack_A/Pump_01",
+  "property":   "flownex:componentName",
+  "value":      "Pump_01"
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `type` | string | Always `"prim_property_result"` |
+| `event_type` | string | `"prim_property_result"` |
 | `prim_path` | string | Resolved USD prim path |
 | `property` | string | The attribute that was queried |
 | `value` | any | Attribute value (`null` when not found) |
 
 ---
 
-## Installation
+## Debugging
 
-### Method 1 — Kit extension search path (recommended)
+Enable verbose output for the Script Editor handler:
 
-1. Copy (or symlink) the `exts/omni.webrtc.flownex_bridge` directory into a folder that is on your Kit extension search path, for example:
-
-   ```
-   %USERPROFILE%\Documents\kit\shared\exts\    (Windows)
-   ~/Documents/kit/shared/exts/                (Linux / macOS)
-   ```
-
-2. In **Omniverse Launcher → Settings → Extension Search Paths**, ensure the path above is listed.
-
-3. Open **Window → Extensions**, search for "Flownex WebRTC Bridge", and enable it.
-
-### Method 2 — Local extension folder in Kit config
-
-Add the `exts/` directory to your Kit application's `[settings]` in `<app>.kit`:
-
-```toml
-[settings]
-exts."omni.kit.registry.nucleus".registries = []
-
-[[ext_folders]]
-path = "${app}/../../../omniverse-kit-extension/exts"
+```python
+import logging
+logging.getLogger("flownex_prim_handler").setLevel(logging.INFO)
 ```
 
-### Method 3 — Development mode (Omniverse Code / USD Composer)
-
-1. Open **Window → Extensions → ☰ (hamburger) → Settings**.
-2. Add `<repo-root>/omniverse-kit-extension/exts` to the **Extension Search Paths**.
-3. Search for "flownex" and enable the extension.
-
----
-
-## Requirements
-
-| Requirement | Notes |
-|---|---|
-| Omniverse Kit ≥ 104 | Tested on Kit 104–106 |
-| `omni.services.streaming.manager` **or** `omni.kit.livestream.messaging` | One of these must be present for messaging to work.  Kit 105+ ships the former; older versions ship the latter. |
-| USD stage open | The extension reads attributes from the currently open USD stage. |
-
----
-
-## Development / debugging
-
-Enable verbose logging for this extension:
-
-```toml
-# In your app .kit file
-[settings.log]
-level = "DEBUG"
-channel."omni.webrtc.flownex_bridge" = "DEBUG"
-```
-
-Or at runtime in the Script Editor:
+Enable verbose output for the packaged extension:
 
 ```python
 import logging
@@ -121,12 +140,16 @@ logging.getLogger("omni.webrtc.flownex_bridge").setLevel(logging.DEBUG)
 ## File structure
 
 ```
+kit-startup-script/
+└── prim_query_handler.py       ← paste into Script Editor (Method 0)
+
 omniverse-kit-extension/
 └── exts/
     └── omni.webrtc.flownex_bridge/
         ├── config/
-        │   └── extension.toml          ← Kit manifest
+        │   └── extension.toml  ← Kit manifest (Method 1)
         └── omni/webrtc/flownex_bridge/
             ├── __init__.py
-            └── extension.py            ← all logic lives here
+            └── extension.py    ← same logic, packaged as an extension
 ```
+
