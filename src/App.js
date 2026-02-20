@@ -90,8 +90,9 @@ export default function App() {
     status: "hidden",      // "hidden" | "querying" | "found" | "not_found" | "error"
     x: 0,
     y: 0,
-    componentName: null,
     primPath: null,
+    property: null,        // USD attribute name that was queried
+    value: null,           // value returned by Kit
   });
 
   // Progress ring shown while the user holds (0–1 fraction)
@@ -272,7 +273,7 @@ export default function App() {
     holdStartRef.current = Date.now();
 
     // Close any existing HUD
-    setPrimHud({ status: "hidden", x: 0, y: 0, componentName: null, primPath: null });
+    setPrimHud({ status: "hidden", x: 0, y: 0, primPath: null, property: null, value: null });
 
     // Start progress-ring animation
     holdRafRef.current = requestAnimationFrame(animateRing);
@@ -281,26 +282,31 @@ export default function App() {
     holdTimerRef.current = setTimeout(() => {
       holdTimerRef.current = null;
       const { x, y, normX: nx, normY: ny } = holdQueryPosRef.current;
-      setPrimHud({ status: "querying", x, y, componentName: null, primPath: null });
+      setPrimHud({ status: "querying", x, y, primPath: null, property: null, value: null });
       setHoldRing({ visible: false, x: 0, y: 0, pct: 0 });
 
-      // Send pick query to Omniverse Kit extension
+      // Send property query to Omniverse Kit extension.
+      // prim_path is empty → Kit performs a viewport pick at (pick.x, pick.y)
+      // to resolve the prim, then reads the requested attribute.
       const queryMsg = JSON.stringify({
-        event_type: "query_flownex_component",
-        payload: { x: nx, y: ny },
+        type: "get_prim_property",
+        prim_path: "",
+        property: "flownex:componentName",
+        pick: { x: nx, y: ny },
       });
 
       if (streamMode === "omniverse") {
         AppStream.sendMessage(queryMsg);
       } else {
-        // Dev/stub mode: simulate a response after a short delay
+        // Dev/stub mode: simulate a Kit response after a short delay
         setTimeout(() => {
           setPrimHud({
             status: "found",
             x,
             y,
-            componentName: "Pump_01 [stub]",
             primPath: "/World/DataCenter/Rack_A/Pump_01",
+            property: "flownex:componentName",
+            value: "Pump_01 [stub]",
           });
         }, 600);
       }
@@ -333,21 +339,20 @@ export default function App() {
     }
   }, [cancelHold]);
 
-  // Handle custom events coming back from the Omniverse Kit extension
+  // Handle custom events coming back from the Omniverse Kit extension.
+  // The Kit extension responds to "get_prim_property" with "prim_property_result".
   const handleCustomEvent = useCallback((event) => {
     if (!event) return;
-    if (event.event_type === "flownex_component_info") {
-      const payload = event.payload || event.data || {};
-      const componentName =
-        payload["flownex:componentName"] ??
-        payload["flownex_component_name"] ??
-        null;
-      const primPath = payload.prim_path ?? payload.primPath ?? null;
+    if (event.type === "prim_property_result") {
+      const primPath = event.prim_path ?? null;
+      const property = event.property ?? null;
+      const value    = event.value !== undefined ? event.value : null;
       setPrimHud((prev) => ({
         ...prev,
-        status: componentName ? "found" : "not_found",
-        componentName,
+        status: value !== null ? "found" : "not_found",
         primPath,
+        property,
+        value,
       }));
     }
   }, []);
@@ -693,10 +698,11 @@ export default function App() {
         x={primHud.x}
         y={primHud.y}
         status={primHud.status}
-        componentName={primHud.componentName}
+        property={primHud.property}
+        value={primHud.value}
         primPath={primHud.primPath}
         onClose={() =>
-          setPrimHud({ status: "hidden", x: 0, y: 0, componentName: null, primPath: null })
+          setPrimHud({ status: "hidden", x: 0, y: 0, primPath: null, property: null, value: null })
         }
       />
     </div>
