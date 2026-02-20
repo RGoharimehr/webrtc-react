@@ -4,6 +4,11 @@ import StreamConfig from '../stream.config.json';
 // Using real NVIDIA Omniverse WebRTC Streaming Library
 import { AppStreamer, StreamType } from '@nvidia/omniverse-webrtc-streaming-library';
 
+// Delay after calling AppStreamer.stop() before calling connect().
+// The library Promise resolves client-side before the Omniverse NVST server
+// finishes releasing its threads; connecting too soon causes NVST_R_BUSY.
+const NVST_SERVER_TEARDOWN_DELAY_MS = 2000;
+
 class AppStream extends Component {
     constructor(props) {
         super(props);
@@ -17,53 +22,78 @@ class AppStream extends Component {
     componentDidMount() {
         if (!this._requested) {
             this._requested = true;
+            this._startStream();
+        }
+    }
 
-            let streamConfig;
-            let streamSource;
-
-            if (StreamConfig.source === 'local') {
-                streamSource = StreamType.DIRECT;
-                streamConfig = {
-                    videoElementId: 'remote-video',
-                    audioElementId: 'remote-audio',
-                    authenticate: true,
-                    maxReconnects: 20,
-                    signalingServer: StreamConfig.local.server,
-                    signalingPort: StreamConfig.local.signalingPort,
-                    mediaServer: StreamConfig.local.server,
-                    ...(StreamConfig.local.mediaPort != null && { mediaPort: StreamConfig.local.mediaPort }),
-                    nativeTouchEvents: true,
-                    width: 1920,
-                    height: 1080,
-                    fps: 60,
-                    onUpdate: (message) => this._onUpdate(message),
-                    onStart: (message) => this._onStart(message),
-                    onCustomEvent: (message) => this._onCustomEvent(message),
-                    onStop: (message) => { console.log('Stream stopped:', message) },
-                    onTerminate: (message) => { console.log('Stream terminated:', message) }
-                };
-            } else {
-                console.error(`Unknown or unsupported stream source: ${StreamConfig.source}`);
-                return;
+    async _startStream() {
+        // Wait for any previous session to fully stop on the server before connecting.
+        // Calling connect() while the server is still tearing down causes NVST_R_BUSY.
+        try {
+            const stopResult = AppStreamer.stop();
+            if (stopResult && typeof stopResult.then === 'function') {
+                await stopResult.catch((err) =>
+                    console.warn('AppStreamer.stop() before connect:', err)
+                );
             }
+        } catch (error) {
+            console.warn('AppStreamer.stop() before connect failed:', error);
+        }
 
-            try {
-                const streamProps = { streamConfig, streamSource };
-                AppStreamer.connect(streamProps)
-                    .then((result) => {
-                        console.info('AppStreamer connected:', result);
-                    })
-                    .catch((error) => {
-                        console.error('AppStreamer connection error:', error);
-                        if (this.props.onStreamFailed) {
-                            this.props.onStreamFailed();
-                        }
-                    });
-            } catch (error) {
-                console.error('Error initializing AppStreamer:', error);
-                if (this.props.onStreamFailed) {
-                    this.props.onStreamFailed();
-                }
+        if (!this._requested) return; // component was unmounted while stopping
+
+        // Give the Omniverse NVST server time to fully release its threads after stop().
+        // The library Promise resolves client-side before server-side teardown completes,
+        // so connecting too soon causes NVST_R_BUSY errors.
+        await new Promise((resolve) => setTimeout(resolve, NVST_SERVER_TEARDOWN_DELAY_MS));
+
+        if (!this._requested) return; // check again after the delay
+
+        let streamConfig;
+        let streamSource;
+
+        if (StreamConfig.source === 'local') {
+            streamSource = StreamType.DIRECT;
+            streamConfig = {
+                videoElementId: 'remote-video',
+                audioElementId: 'remote-audio',
+                authenticate: true,
+                maxReconnects: 0,
+                signalingServer: StreamConfig.local.server,
+                signalingPort: StreamConfig.local.signalingPort,
+                mediaServer: StreamConfig.local.server,
+                ...(StreamConfig.local.mediaPort != null && { mediaPort: StreamConfig.local.mediaPort }),
+                nativeTouchEvents: true,
+                width: 1920,
+                height: 1080,
+                fps: 60,
+                onUpdate: (message) => this._onUpdate(message),
+                onStart: (message) => this._onStart(message),
+                onCustomEvent: (message) => this._onCustomEvent(message),
+                onStop: (message) => { console.log('Stream stopped:', message); },
+                onTerminate: (message) => { console.log('Stream terminated:', message); }
+            };
+        } else {
+            console.error(`Unknown or unsupported stream source: ${StreamConfig.source}`);
+            return;
+        }
+
+        try {
+            const streamProps = { streamConfig, streamSource };
+            AppStreamer.connect(streamProps)
+                .then((result) => {
+                    console.info('AppStreamer connected:', result);
+                })
+                .catch((error) => {
+                    console.error('AppStreamer connection error:', error);
+                    if (this._requested && this.props.onStreamFailed) {
+                        this.props.onStreamFailed();
+                    }
+                });
+        } catch (error) {
+            console.error('Error initializing AppStreamer:', error);
+            if (this._requested && this.props.onStreamFailed) {
+                this.props.onStreamFailed();
             }
         }
     }
@@ -81,8 +111,12 @@ class AppStream extends Component {
     }
 
     componentWillUnmount() {
+        this._requested = false; // allow _startStream to bail if stop() completes after unmount
         try {
-            AppStreamer.stop();
+            const stopResult = AppStreamer.stop();
+            if (stopResult && typeof stopResult.catch === 'function') {
+                stopResult.catch((error) => console.warn('Error stopping AppStreamer:', error));
+            }
         } catch (error) {
             console.warn('Error stopping AppStreamer:', error);
         }

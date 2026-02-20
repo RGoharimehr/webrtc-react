@@ -2,9 +2,16 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
 const WS_URL = "ws://127.0.0.1:8001/ws";
+const MAX_RECONNECT_ATTEMPTS = 10;
+const BASE_RECONNECT_DELAY_MS = 1000;
+const MAX_RECONNECT_DELAY_MS = 30000;
 
 export function useBridge() {
   const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
+  const isManualCloseRef = useRef(false);
+  const messageQueueRef = useRef([]);
 
   const [connected, setConnected] = useState(false);
   const [state, setState] = useState(null);
@@ -14,71 +21,116 @@ export function useBridge() {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(msg));
+    } else {
+      messageQueueRef.current.push(msg);
     }
   }, []);
 
   useEffect(() => {
-    const ws = new WebSocket(WS_URL);
-    wsRef.current = ws;
+    isManualCloseRef.current = false;
 
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
+    function connect() {
+      const ws = new WebSocket(WS_URL);
+      wsRef.current = ws;
 
-    ws.onmessage = (ev) => {
-      let m;
-      try {
-        m = JSON.parse(ev.data);
-      } catch {
-        return;
-      }
+      ws.onopen = () => {
+        if (wsRef.current !== ws) return;
+        reconnectAttemptsRef.current = 0;
+        setConnected(true);
+        const queue = messageQueueRef.current.splice(0);
+        for (const msg of queue) {
+          try {
+            ws.send(JSON.stringify(msg));
+          } catch (err) {
+            console.warn("Failed to send queued message", msg, err);
+          }
+        }
+      };
 
-      if (m.type === "schema") {
-        setSchema(m.payload || { inputs: [], outputs: [] });
-        return;
-      }
+      ws.onclose = () => {
+        if (wsRef.current !== ws) return;
+        setConnected(false);
+        if (isManualCloseRef.current) return;
+        const attempts = reconnectAttemptsRef.current;
+        if (attempts >= MAX_RECONNECT_ATTEMPTS) {
+          console.error("WebSocket: max reconnection attempts reached.");
+          return;
+        }
+        const delay = Math.min(
+          BASE_RECONNECT_DELAY_MS * Math.pow(2, attempts),
+          MAX_RECONNECT_DELAY_MS
+        );
+        reconnectAttemptsRef.current = attempts + 1;
+        reconnectTimeoutRef.current = setTimeout(connect, delay);
+      };
 
-      if (m.type === "state") {
-        setState(m.payload);
-        return;
-      }
+      ws.onmessage = (ev) => {
+        let m;
+        try {
+          m = JSON.parse(ev.data);
+        } catch {
+          return;
+        }
 
-      if (m.type === "inputs_delta") {
-        const { scope, key, value } = m.payload || {};
-        setState((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            inputs: {
-              ...(prev.inputs || {}),
-              [scope]: { ...(prev.inputs?.[scope] || {}), [key]: value },
-            },
-          };
-        });
-        return;
-      }
+        if (m.type === "schema") {
+          setSchema(m.payload || { inputs: [], outputs: [] });
+          return;
+        }
 
-      if (m.type === "outputs_delta") {
-        const { key, value } = m.payload || {};
-        setState((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            outputs: { ...(prev.outputs || {}), [key]: value },
-          };
-        });
-        return;
-      }
+        if (m.type === "state") {
+          setState(m.payload);
+          return;
+        }
 
-      if (m.type === "status") {
-        setState((prev) => (prev ? { ...prev, status: m.payload } : prev));
-        return;
-      }
-    };
+        if (m.type === "inputs_delta") {
+          const { scope, key, value } = m.payload || {};
+          setState((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              inputs: {
+                ...(prev.inputs || {}),
+                [scope]: { ...(prev.inputs?.[scope] || {}), [key]: value },
+              },
+            };
+          });
+          return;
+        }
+
+        if (m.type === "outputs_delta") {
+          const { key, value } = m.payload || {};
+          setState((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              outputs: { ...(prev.outputs || {}), [key]: value },
+            };
+          });
+          return;
+        }
+
+        if (m.type === "status") {
+          setState((prev) => (prev ? { ...prev, status: m.payload } : prev));
+          return;
+        }
+      };
+    }
+
+    connect();
 
     return () => {
-      try {
-        ws.close();
-      } catch {}
+      isManualCloseRef.current = true;
+      clearTimeout(reconnectTimeoutRef.current);
+      const ws = wsRef.current;
+      wsRef.current = null;
+      if (ws) {
+        ws.onopen = null;
+        ws.onclose = null;
+        ws.onmessage = null;
+        try {
+          ws.close();
+        } catch {}
+      }
     };
   }, []);
 
