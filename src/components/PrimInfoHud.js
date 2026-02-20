@@ -38,11 +38,11 @@ const PrimInfoHud = ({ x, y, status, property, value, primPath, onClose }) => {
       className="prim-info-hud"
       style={{ left, top }}
       role="tooltip"
-      aria-label="USD prim info"
+      aria-label="Thermofluidic prim info"
     >
       {/* ── Header ── */}
       <div className="prim-info-hud-header">
-        <span className="prim-info-hud-title">USD Prim Info</span>
+        <span className="prim-info-hud-title">Thermofluidic Info</span>
         <button className="prim-info-hud-close" onClick={onClose} aria-label="Close">
           ×
         </button>

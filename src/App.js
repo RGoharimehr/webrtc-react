@@ -103,6 +103,7 @@ export default function App() {
   const holdStartRef     = useRef(null);  // timestamp of pointer-down
   const holdQueryPosRef  = useRef({ x: 0, y: 0, normX: 0, normY: 0 });
   const streamBgRef      = useRef(null);  // ref on the .stream-background div
+  const infoKeyHeldRef   = useRef(false); // true while the "i" key is pressed
   // ─────────────────────────────────────────────────────────────────────────
 
   // Docks
@@ -262,6 +263,9 @@ export default function App() {
     if (streamMode === "screen") return;
     // Only primary button
     if (e.button !== undefined && e.button !== 0) return;
+    // Require the "i" key to be held — prevents the ring from appearing on
+    // every ordinary click on the stream background.
+    if (!infoKeyHeldRef.current) return;
 
     const rect = (streamBgRef.current || e.currentTarget).getBoundingClientRect();
     const cx = e.clientX;
@@ -359,6 +363,26 @@ export default function App() {
 
   // Cleanup hold timer on unmount
   useEffect(() => () => cancelHold(), [cancelHold]);
+
+  // Track whether the "i" key is held — the hold gesture only activates while
+  // this key is down, so normal clicks elsewhere don't trigger the HUD.
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "i" || e.key === "I") infoKeyHeldRef.current = true;
+    };
+    const onKeyUp = (e) => {
+      if (e.key === "i" || e.key === "I") {
+        infoKeyHeldRef.current = false;
+        cancelHold(); // cancel any in-progress hold when the key is released
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup",   onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup",   onKeyUp);
+    };
+  }, [cancelHold]);
   // ─────────────────────────────────────────────────────────────────────────
 
   const renderTabContent = () => {
