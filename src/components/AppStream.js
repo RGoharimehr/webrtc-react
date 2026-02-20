@@ -8,6 +8,8 @@ import { AppStreamer, StreamType } from '@nvidia/omniverse-webrtc-streaming-libr
 // The library Promise resolves client-side before the Omniverse NVST server
 // finishes releasing its threads; connecting too soon causes NVST_R_BUSY.
 const NVST_SERVER_TEARDOWN_DELAY_MS = 2000;
+
+class AppStream extends Component {
     constructor(props) {
         super(props);
         
