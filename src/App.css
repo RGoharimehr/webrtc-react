@@ -431,6 +431,17 @@ button.success {
 
 button.success:hover { background: #74B405; }
 
+button.warning {
+  background: rgba(255, 204, 0, 0.12);
+  border-color: rgba(255, 204, 0, 0.35);
+  color: var(--warning-yellow);
+}
+
+button.warning:hover {
+  background: rgba(255, 204, 0, 0.22);
+  border-color: rgba(255, 204, 0, 0.55);
+}
+
 /* Key metrics viewport (unchanged) */
 .key-metrics-viewport {
   position: fixed;

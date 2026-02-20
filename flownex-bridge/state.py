@@ -77,6 +77,9 @@ class BridgeState:
         # Project
         self.connected_project: Optional[str] = None
 
+        # Active simulation backend
+        self.backend: str = "flownex"
+
         # Schema
         self.inputs_def: Dict[str, InputDef] = {}
         self.outputs_def: Dict[str, OutputDef] = {}
@@ -133,6 +136,7 @@ class BridgeState:
     def state_dict(self) -> Dict[str, Any]:
         return {
             "connected_project": self.connected_project,
+            "backend": self.backend,
             "inputs": self.inputs,
             "outputs": self.outputs,
             "status": self.status_dict(),

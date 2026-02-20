@@ -135,11 +135,11 @@ export function useBridge() {
   }, []);
 
   // ---------- NEW: build/config commands ----------
-  const configure = (projectPath, ioDir) =>
+  const configure = (projectPath, ioDir, backend) =>
     send({
       type: "configure",
       id: crypto.randomUUID(),
-      payload: { projectPath, ioDir },
+      payload: { projectPath, ioDir, backend: backend || "flownex" },
     });
 
   const openProject = () =>
@@ -149,7 +149,15 @@ export function useBridge() {
     send({ type: "close_project", id: crypto.randomUUID(), payload: {} });
 
   const closeFlownex = () =>
-    send({ type: "close_flownex", id: crypto.randomUUID(), payload: {} });
+    send({ type: "close_app", id: crypto.randomUUID(), payload: {} });
+
+  // ---------- Custom message (for user-loaded scripts) ----------
+  const sendCustom = (msgType, payload) =>
+    send({
+      type: "custom_msg",
+      id: crypto.randomUUID(),
+      payload: { msgType, payload: payload || {} },
+    });
 
   // ---------- Existing commands ----------
   const connectProject = (projectPath) =>
@@ -168,6 +176,31 @@ export function useBridge() {
   const getState = () =>
     send({ type: "get_state", id: crypto.randomUUID(), payload: {} });
 
+  // Expose bridge API globally so user-loaded custom scripts can call it.
+  // We use a stable ref object so window.__bridgeAPI always holds the latest
+  // values without triggering stale-closure issues in custom scripts.
+  // Custom scripts can use: window.__bridgeAPI.sendCustom("myCmd", {...})
+  const bridgeAPIRef = useRef({});
+  bridgeAPIRef.current = {
+    connected,
+    state,
+    schema,
+    send,
+    configure,
+    openProject,
+    closeProject,
+    closeFlownex,
+    sendCustom,
+    setInput,
+    runSteady,
+    getState,
+  };
+  if (!window.__bridgeAPI) {
+    window.__bridgeAPI = bridgeAPIRef.current;
+  } else {
+    Object.assign(window.__bridgeAPI, bridgeAPIRef.current);
+  }
+
   return {
     connected,
     state,
@@ -178,6 +211,7 @@ export function useBridge() {
     openProject,
     closeProject,
     closeFlownex,
+    sendCustom,
 
     // old API
     connectProject,
