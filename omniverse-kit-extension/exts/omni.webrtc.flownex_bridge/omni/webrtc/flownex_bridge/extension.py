@@ -59,22 +59,25 @@ def _get_streaming_manager():
 def _send_message_to_web(payload: dict) -> None:
     """Serialise *payload* and send it to all connected web clients."""
     raw = json.dumps(payload)
+    log.info("FlownexBridge: _send_message_to_web — trying to send: %s", raw)
 
     # Try omni.services.streaming.manager (Kit 105+)
     try:
         import omni.services.streaming.manager as sm
         sm.get_instance().send_message(raw)
+        log.info("FlownexBridge: _send_message_to_web — sent via omni.services.streaming.manager")
         return
-    except Exception:
-        pass
+    except Exception as exc:
+        log.info("FlownexBridge: _send_message_to_web — streaming.manager failed: %s", exc)
 
     # Try omni.kit.livestream.messaging (older Kit)
     try:
         from omni.kit.livestream.messaging import send_message_to_clients
         send_message_to_clients(raw)
+        log.info("FlownexBridge: _send_message_to_web — sent via omni.kit.livestream.messaging")
         return
-    except Exception:
-        pass
+    except Exception as exc:
+        log.info("FlownexBridge: _send_message_to_web — livestream.messaging failed: %s", exc)
 
     # Try direct AppStreamer message bus
     try:
@@ -82,11 +85,12 @@ def _send_message_to_web(payload: dict) -> None:
         msg_bus = kit_app.get_app().get_message_bus_event_stream()
         event = carb.events.type_from_string("omni.kit.app.messaging.OUT")
         msg_bus.push(event, payload={"data": raw})
+        log.info("FlownexBridge: _send_message_to_web — sent via message bus event stream")
         return
-    except Exception:
-        pass
+    except Exception as exc:
+        log.info("FlownexBridge: _send_message_to_web — message bus failed: %s", exc)
 
-    log.warning("FlownexBridge: no messaging API found — response not sent: %s", raw)
+    log.warning("FlownexBridge: _send_message_to_web — ALL send methods exhausted, response not delivered: %s", raw)
 
 
 # ---------------------------------------------------------------------------
@@ -153,32 +157,39 @@ def _pick_prim_at_ndc(norm_x: float, norm_y: float) -> str | None:
         import omni.kit.viewport.utility as vp_util
         viewport_api = vp_util.get_active_viewport()
         if viewport_api is None:
+            log.info("FlownexBridge: _pick_prim_at_ndc — no active viewport found")
             return None
 
         # Convert normalised coords to pixel coords
         w, h = viewport_api.resolution
         px = int(norm_x * w)
         py = int(norm_y * h)
+        log.info("FlownexBridge: _pick_prim_at_ndc — viewport %dx%d, pixel (%d, %d)", w, h, px, py)
 
         # Kit 105 API
         result = viewport_api.pick(px, py)
+        log.info("FlownexBridge: _pick_prim_at_ndc — viewport.pick result: %r", result)
         if result:
             prim_path = str(result.path) if hasattr(result, "path") else str(result)
-            return prim_path if prim_path not in ("", "/") else None
+            resolved = prim_path if prim_path not in ("", "/") else None
+            log.info("FlownexBridge: _pick_prim_at_ndc — resolved prim_path=%r", resolved)
+            return resolved
     except Exception as exc:
-        log.debug("FlownexBridge: viewport pick failed (%s) — falling back", exc)
+        log.info("FlownexBridge: _pick_prim_at_ndc — viewport utility failed (%s) — trying fallback", exc)
 
-    # Fallback: omni.usd picking (older Kit / no viewport utility)
+    # Fallback: omni.usd selection (older Kit / no viewport utility)
     try:
         import omni.usd as ousd
         ctx = ousd.get_context()
         if ctx:
             selected = ctx.get_selection().get_selected_prim_paths()
+            log.info("FlownexBridge: _pick_prim_at_ndc — selection fallback, selected=%r", selected)
             if selected:
                 return selected[0]
-    except Exception:
-        pass
+    except Exception as exc:
+        log.info("FlownexBridge: _pick_prim_at_ndc — selection fallback failed: %s", exc)
 
+    log.info("FlownexBridge: _pick_prim_at_ndc — no prim resolved, returning None")
     return None
 
 
@@ -263,36 +274,50 @@ class FlownexBridgeExtension(omni.ext.IExt):
         *raw* may be a JSON string or an already-decoded dict depending on
         which API version is installed.
         """
+        log.info("FlownexBridge: _on_web_message called, raw type=%s", type(raw).__name__)
+
         if isinstance(raw, (str, bytes)):
             try:
                 msg = json.loads(raw)
-            except json.JSONDecodeError:
+                log.info("FlownexBridge: message parsed OK, type=%s", msg.get("type"))
+            except json.JSONDecodeError as exc:
+                log.warning("FlownexBridge: JSON decode error — %s — raw was: %r", exc, raw)
                 return
         elif isinstance(raw, dict):
             msg = raw
+            log.info("FlownexBridge: message already a dict, type=%s", msg.get("type"))
         else:
+            log.warning("FlownexBridge: unexpected raw type %s — ignoring", type(raw).__name__)
             return
 
         if msg.get("type") != "get_prim_property":
+            log.info("FlownexBridge: ignoring message type=%r", msg.get("type"))
             return
 
         prim_path: str = msg.get("prim_path") or ""
         attr_name: str = msg.get("property") or ""
         pick_coords: dict = msg.get("pick") or {}
 
+        log.info(
+            "FlownexBridge: get_prim_property — prim_path=%r, property=%r, pick=%r",
+            prim_path, attr_name, pick_coords,
+        )
+
         # Validate required field
         if not attr_name:
-            log.warning("FlownexBridge: 'property' field missing in get_prim_property message")
+            log.warning("FlownexBridge: 'property' field missing — cannot query")
             return
 
         # Resolve prim_path via viewport pick when it was not supplied
         if not prim_path:
             norm_x = float(pick_coords.get("x", 0.5))
             norm_y = float(pick_coords.get("y", 0.5))
+            log.info("FlownexBridge: no prim_path supplied — picking at NDC (%.3f, %.3f)", norm_x, norm_y)
             prim_path = _pick_prim_at_ndc(norm_x, norm_y) or ""
+            log.info("FlownexBridge: viewport pick resolved prim_path=%r", prim_path)
 
         if not prim_path:
-            log.debug("FlownexBridge: could not resolve prim path — sending null result")
+            log.info("FlownexBridge: prim_path still empty after pick — sending null result")
             _send_message_to_web({
                 "type":      "prim_property_result",
                 "prim_path": "",
@@ -301,19 +326,18 @@ class FlownexBridgeExtension(omni.ext.IExt):
             })
             return
 
+        log.info("FlownexBridge: reading attribute '%s' on prim '%s'", attr_name, prim_path)
         value = _read_attribute(prim_path, attr_name)
+        log.info("FlownexBridge: attribute value = %r", value)
 
-        log.debug(
-            "FlownexBridge: %s.%s = %r",
-            prim_path, attr_name, value,
-        )
-
-        _send_message_to_web({
+        response = {
             "type":      "prim_property_result",
             "prim_path": prim_path,
             "property":  attr_name,
             "value":     value,
-        })
+        }
+        log.info("FlownexBridge: sending response: %r", response)
+        _send_message_to_web(response)
 
 
 # ---------------------------------------------------------------------------

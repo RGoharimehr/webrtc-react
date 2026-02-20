@@ -124,9 +124,11 @@ class AppStream extends Component {
 
     static sendMessage(message) {
         try {
+            console.log("[PrimQuery] AppStream.sendMessage — sending:", message);
             AppStreamer.sendMessage(message);
+            console.log("[PrimQuery] AppStream.sendMessage — AppStreamer.sendMessage() returned (no error thrown)");
         } catch (error) {
-            console.error('Error sending message:', error);
+            console.error("[PrimQuery] AppStream.sendMessage — ERROR:", error);
         }
     }
 
@@ -169,8 +171,11 @@ class AppStream extends Component {
     }
 
     _onCustomEvent(message) {
+        console.log("[PrimQuery] AppStream._onCustomEvent — raw message from Kit:", message);
         if (this.props.handleCustomEvent) {
             this.props.handleCustomEvent(message);
+        } else {
+            console.warn("[PrimQuery] AppStream._onCustomEvent — handleCustomEvent prop not set, message dropped");
         }
     }
 

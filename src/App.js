@@ -260,12 +260,23 @@ export default function App() {
 
   const handleStreamPointerDown = useCallback((e) => {
     // Only activate for the Omniverse stream (or no stream — dev mode)
-    if (streamMode === "screen") return;
+    if (streamMode === "screen") {
+      console.log("[PrimQuery] pointerDown ignored — streamMode is 'screen'");
+      return;
+    }
     // Only primary button
-    if (e.button !== undefined && e.button !== 0) return;
+    if (e.button !== undefined && e.button !== 0) {
+      console.log("[PrimQuery] pointerDown ignored — not primary button (button=" + e.button + ")");
+      return;
+    }
     // Require the "i" key to be held — prevents the ring from appearing on
     // every ordinary click on the stream background.
-    if (!infoKeyHeldRef.current) return;
+    if (!infoKeyHeldRef.current) {
+      // Silent — this is the normal case when I is not held
+      return;
+    }
+
+    console.log("[PrimQuery] Hold started (streamMode=" + streamMode + ")");
 
     const rect = (streamBgRef.current || e.currentTarget).getBoundingClientRect();
     const cx = e.clientX;
@@ -286,6 +297,7 @@ export default function App() {
     holdTimerRef.current = setTimeout(() => {
       holdTimerRef.current = null;
       const { x, y, normX: nx, normY: ny } = holdQueryPosRef.current;
+      console.log("[PrimQuery] 1-second hold complete — setting status=querying, normX=" + nx.toFixed(3) + " normY=" + ny.toFixed(3));
       setPrimHud({ status: "querying", x, y, primPath: null, property: null, value: null });
       setHoldRing({ visible: false, x: 0, y: 0, pct: 0 });
 
@@ -300,10 +312,14 @@ export default function App() {
       });
 
       if (streamMode === "omniverse") {
+        console.log("[PrimQuery] Sending get_prim_property to Omniverse Kit:", queryMsg);
         AppStream.sendMessage(queryMsg);
+        console.log("[PrimQuery] sendMessage called — waiting for prim_property_result...");
       } else {
+        console.log("[PrimQuery] No live stream — using stub response (600 ms delay)");
         // Dev/stub mode: simulate a Kit response after a short delay
         setTimeout(() => {
+          console.log("[PrimQuery] Stub response fired — setting status=found");
           setPrimHud({
             status: "found",
             x,
@@ -321,6 +337,7 @@ export default function App() {
   const handleStreamPointerUp = useCallback(() => {
     // If the timer has already fired we leave the HUD open; just clean up animation.
     if (holdTimerRef.current) {
+      console.log("[PrimQuery] Pointer released before 1 s — cancelling hold");
       cancelHold(); // Released before 1 s — cancel everything
     } else {
       // Timer already fired — only stop the ring animation
@@ -346,19 +363,26 @@ export default function App() {
   // Handle custom events coming back from the Omniverse Kit extension.
   // The Kit extension responds to "get_prim_property" with "prim_property_result".
   const handleCustomEvent = useCallback((event) => {
-    if (!event) return;
-    if (event.type === "prim_property_result") {
-      const primPath = event.prim_path ?? null;
-      const property = event.property ?? null;
-      const value    = event.value !== undefined ? event.value : null;
-      setPrimHud((prev) => ({
-        ...prev,
-        status: value !== null ? "found" : "not_found",
-        primPath,
-        property,
-        value,
-      }));
+    console.log("[PrimQuery] handleCustomEvent fired — raw event:", event);
+    if (!event) {
+      console.warn("[PrimQuery] handleCustomEvent called with null/undefined — ignoring");
+      return;
     }
+    if (event.type !== "prim_property_result") {
+      console.log("[PrimQuery] handleCustomEvent — ignoring event type:", event.type);
+      return;
+    }
+    const primPath = event.prim_path ?? null;
+    const property = event.property ?? null;
+    const value    = event.value !== undefined ? event.value : null;
+    console.log("[PrimQuery] prim_property_result received — primPath:", primPath, "property:", property, "value:", value);
+    setPrimHud((prev) => ({
+      ...prev,
+      status: value !== null ? "found" : "not_found",
+      primPath,
+      property,
+      value,
+    }));
   }, []);
 
   // Cleanup hold timer on unmount
@@ -368,10 +392,14 @@ export default function App() {
   // this key is down, so normal clicks elsewhere don't trigger the HUD.
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.key === "i" || e.key === "I") infoKeyHeldRef.current = true;
+      if (e.key === "i" || e.key === "I") {
+        console.log("[PrimQuery] 'i' key pressed — prim-query mode ON");
+        infoKeyHeldRef.current = true;
+      }
     };
     const onKeyUp = (e) => {
       if (e.key === "i" || e.key === "I") {
+        console.log("[PrimQuery] 'i' key released — prim-query mode OFF");
         infoKeyHeldRef.current = false;
         cancelHold(); // cancel any in-progress hold when the key is released
       }
