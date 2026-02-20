@@ -785,6 +785,15 @@ export default function App() {
         onClose={() =>
           setPrimHud({ status: "hidden", x: 0, y: 0, primPath: null, property: null, value: null })
         }
+        onDemoMode={() =>
+          setPrimHud((prev) => ({
+            ...prev,
+            status: "found",
+            primPath: "/World/DataCenter/Rack_A/Pump_01",
+            property: "flownex:componentName",
+            value: "Pump_01 [demo]",
+          }))
+        }
       />
     </div>
   );
