@@ -302,10 +302,12 @@ export default function App() {
       setHoldRing({ visible: false, x: 0, y: 0, pct: 0 });
 
       // Send property query to Omniverse Kit extension.
-      // prim_path is empty → Kit performs a viewport pick at (pick.x, pick.y)
-      // to resolve the prim, then reads the requested attribute.
+      // IMPORTANT: the Omniverse streaming library routes custom messages by the
+      // "event_type" field, so we must include it.  "type" is kept for protocol
+      // documentation consistency and for the Kit extension's own filter.
       const queryMsg = JSON.stringify({
-        type: "get_prim_property",
+        event_type: "get_prim_property",   // ← routing key used by omni.kit.livestream.messaging
+        type:       "get_prim_property",   // ← kept for spec / Kit-side fallback
         prim_path: "",
         property: "flownex:componentName",
         pick: { x: nx, y: ny },
@@ -362,14 +364,18 @@ export default function App() {
 
   // Handle custom events coming back from the Omniverse Kit extension.
   // The Kit extension responds to "get_prim_property" with "prim_property_result".
+  // The Omniverse streaming library delivers the response object to onCustomEvent;
+  // Kit may use event_type or type as the discriminator — we check both.
   const handleCustomEvent = useCallback((event) => {
     console.log("[PrimQuery] handleCustomEvent fired — raw event:", event);
     if (!event) {
       console.warn("[PrimQuery] handleCustomEvent called with null/undefined — ignoring");
       return;
     }
-    if (event.type !== "prim_property_result") {
-      console.log("[PrimQuery] handleCustomEvent — ignoring event type:", event.type);
+    // Accept both event_type (Omniverse routing field) and type (spec field)
+    const msgType = event.event_type ?? event.type ?? null;
+    if (msgType !== "prim_property_result") {
+      console.log("[PrimQuery] handleCustomEvent — ignoring msgType:", msgType, "(event_type:", event.event_type, ", type:", event.type, ")");
       return;
     }
     const primPath = event.prim_path ?? null;

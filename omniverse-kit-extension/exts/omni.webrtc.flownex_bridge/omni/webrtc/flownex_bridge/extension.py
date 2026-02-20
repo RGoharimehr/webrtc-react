@@ -241,6 +241,9 @@ class FlownexBridgeExtension(omni.ext.IExt):
             log.debug("FlownexBridge: streaming.manager not available (%s)", exc)
 
         # ── Older Kit ────────────────────────────────────────────────
+        # register_message_handler(event_type, handler) dispatches messages
+        # whose "event_type" field equals the given string.  The browser must
+        # therefore include event_type: "get_prim_property" in its messages.
         try:
             from omni.kit.livestream.messaging import (
                 register_message_handler,
@@ -279,19 +282,24 @@ class FlownexBridgeExtension(omni.ext.IExt):
         if isinstance(raw, (str, bytes)):
             try:
                 msg = json.loads(raw)
-                log.info("FlownexBridge: message parsed OK, type=%s", msg.get("type"))
+                log.info("FlownexBridge: message parsed OK, event_type=%s type=%s",
+                         msg.get("event_type"), msg.get("type"))
             except json.JSONDecodeError as exc:
                 log.warning("FlownexBridge: JSON decode error — %s — raw was: %r", exc, raw)
                 return
         elif isinstance(raw, dict):
             msg = raw
-            log.info("FlownexBridge: message already a dict, type=%s", msg.get("type"))
+            log.info("FlownexBridge: message already a dict, event_type=%s type=%s",
+                     msg.get("event_type"), msg.get("type"))
         else:
             log.warning("FlownexBridge: unexpected raw type %s — ignoring", type(raw).__name__)
             return
 
-        if msg.get("type") != "get_prim_property":
-            log.info("FlownexBridge: ignoring message type=%r", msg.get("type"))
+        # Accept both "event_type" (Omniverse routing field) and "type" (protocol spec field)
+        msg_type = msg.get("event_type") or msg.get("type")
+        if msg_type != "get_prim_property":
+            log.info("FlownexBridge: ignoring msg_type=%r (event_type=%r, type=%r)",
+                     msg_type, msg.get("event_type"), msg.get("type"))
             return
 
         prim_path: str = msg.get("prim_path") or ""
@@ -319,10 +327,11 @@ class FlownexBridgeExtension(omni.ext.IExt):
         if not prim_path:
             log.info("FlownexBridge: prim_path still empty after pick — sending null result")
             _send_message_to_web({
-                "type":      "prim_property_result",
-                "prim_path": "",
-                "property":  attr_name,
-                "value":     None,
+                "event_type": "prim_property_result",
+                "type":       "prim_property_result",
+                "prim_path":  "",
+                "property":   attr_name,
+                "value":      None,
             })
             return
 
@@ -331,10 +340,11 @@ class FlownexBridgeExtension(omni.ext.IExt):
         log.info("FlownexBridge: attribute value = %r", value)
 
         response = {
-            "type":      "prim_property_result",
-            "prim_path": prim_path,
-            "property":  attr_name,
-            "value":     value,
+            "event_type": "prim_property_result",   # Omniverse routing field
+            "type":       "prim_property_result",   # protocol spec field / browser fallback
+            "prim_path":  prim_path,
+            "property":   attr_name,
+            "value":      value,
         }
         log.info("FlownexBridge: sending response: %r", response)
         _send_message_to_web(response)
