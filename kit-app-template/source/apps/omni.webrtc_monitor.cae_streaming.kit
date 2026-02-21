@@ -1,0 +1,120 @@
+# omni.webrtc_monitor.cae_streaming.kit
+#
+# Combined Kit-CAE + Omniverse WebRTC Monitor — streaming launch target.
+#
+# This is the primary launch file when you want to:
+#   • Run the full Kit-CAE application (CAE data import, algorithms, rendering)
+#   • Stream the viewport to the React WebRTC dashboard at http://localhost:3000
+#   • Communicate with the React front-end via the FlownexBridge JSON channel
+#
+# Prerequisites:
+#   1. Clone kit-cae into vendor/kit-cae:
+#        git clone https://github.com/RGoharimehr/kit-cae vendor/kit-cae
+#   2. Build kit-cae:
+#        Linux:   cd vendor/kit-cae && ./repo.sh build -r && cd ../..
+#        Windows: cd vendor\kit-cae && repo.bat build -r && cd ..\..
+#   3. Build this project:
+#        ./repo.sh build   (Linux)
+#        .\repo.bat build  (Windows)
+#   4. Launch:
+#        ./repo.sh launch --app apps/omni.webrtc_monitor.cae_streaming.kit  (Linux)
+#        .\repo.bat launch --app apps\omni.webrtc_monitor.cae_streaming.kit (Windows)
+#   5. Start the React front-end (from the webrtc-react repo root):
+#        npm start
+#   6. Click "Connect Omniverse Stream" in the browser dashboard.
+
+[package]
+title       = "WebRTC Monitor + CAE — Streaming"
+version     = "1.0.0"
+description = "Combined Kit-CAE and WebRTC Monitor streaming application. Streams the CAE viewport to the React dashboard and enables bi-directional JSON messaging via FlownexBridge."
+keywords    = ["app", "cae", "webrtc", "flownex", "streaming", "simulation"]
+
+[dependencies]
+# ── Kit-CAE base application ─────────────────────────────────────────────────
+# Pulls in all omni.cae.* extensions: data delegates, importers, algorithms,
+# USD schemas, IndeX/Flow rendering, context menus, property panels, etc.
+# Requires kit-cae to be built under vendor/kit-cae/ first.
+"omni.cae" = {}
+
+# ── WebRTC streaming ─────────────────────────────────────────────────────────
+# Enables the WebRTC endpoint so the React front-end can connect to the stream.
+"omni.kit.livestream.app" = {}
+
+# ── FlownexBridge extension ───────────────────────────────────────────────────
+# Provides bi-directional JSON messaging between the React dashboard and the
+# USD stage (get_prim_property / prim_property_result protocol).
+"omni.webrtc.flownex_bridge" = {}
+
+[settings.app]
+fastShutdown = true
+name         = "WebRTC Monitor + CAE Streaming"
+
+# Resolution must match stream.config.json → local.signalingPort
+renderer.resolution.width  = 1920
+renderer.resolution.height = 1080
+window.width               = 1920
+window.height              = 1080
+
+[settings]
+# Anti-aliasing: TAA (op=3) is suitable for streaming
+rtx.post.aa.op                   = 3
+rtx.verifyDriverVersion.enabled  = false
+rtx-transient.dlssg.enabled      = false  # Disable DLSS to avoid framerate overshoot
+
+# Kit-CAE specific settings (from omni.cae.kit)
+rtx.hydra.readTransformsFromFabricInRenderDelegate = true
+
+# FLOW specific settings — required by Kit-CAE
+exts."omni.flowusd".voxelize_velocity_vec4  = false
+exts."omni.flowusd".voxelize_velocity_float = true
+
+# IndeX specific settings — required by Kit-CAE
+rtx.index.overrideSubdivisionMode      = "kd_tree"
+rtx.index.overrideSubdivisionPartCount = 1
+rtx.index.compositeEnabled             = 1
+
+[settings.app.extensions]
+registryEnabled           = true
+supportedTargets.config   = ["release"]  # skip platform check during build
+
+exclude = [
+    "omni.kit.developer.bundle",
+    "omni.kit.widget.cache_indicator",
+]
+
+[settings.app.exts]
+folders.'++' = [
+    "${app}/../exts",
+    "${app}/../apps",
+    "${app}/../extscache",
+
+    # Kit-CAE build outputs (linked by premake5.lua prebuild_link)
+    "${app}/../kit-cae/apps",
+    "${app}/../kit-cae/exts",
+
+    # Fallback paths used during repo_precache_exts (before symlinks exist)
+    "./vendor/kit-cae/_build/${platform}/${config}/apps",
+    "./vendor/kit-cae/_build/${platform}/${config}/exts",
+]
+
+[settings.app.file]
+ignoreUnsavedOnExit = true
+
+[settings.app.rendergraph]
+maxFramesInFlight = 2
+
+# WebRTC signalling port — must match stream.config.json → local.signalingPort
+[settings.exts."omni.services.streaming.manager"]
+signalingPort = 49100
+
+[settings.exts."omni.kit.livestream.webrtc"]
+signalingPort = 49100
+
+[settings.log]
+file                       = "logs/omni.webrtc_monitor.cae_streaming.kit.log"
+fileLogLevel               = "info"
+enableStandardStreamOutput = true
+outputStreamLevel          = "warning"
+
+[template]
+type = "ApplicationLayerTemplate"

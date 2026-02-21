@@ -1,0 +1,5 @@
+# Ignore everything inside vendor/kit-cae EXCEPT this README and .gitignore.
+# Users clone https://github.com/RGoharimehr/kit-cae here manually.
+*
+!README.md
+!.gitignore

@@ -986,62 +986,35 @@ MIT
 
 ## 18. Omniverse Kit App Template Integration
 
-The `kit-app-template/` directory in this repository contains all files needed to run the Omniverse Kit side of this project using the [NVIDIA Omniverse Kit App Template](https://github.com/NVIDIA-Omniverse/kit-app-template) build system.
+The `kit-app-template/` directory in this repository contains all files needed to run the Omniverse Kit side of this project using the [NVIDIA Omniverse Kit App Template](https://github.com/NVIDIA-Omniverse/kit-app-template) build system. It also integrates with the **Kit-CAE** fork ([`RGoharimehr/kit-cae`](https://github.com/RGoharimehr/kit-cae)) for full CAE simulation and visualisation.
 
 ### What is inside `kit-app-template/`
 
 | Path | Purpose |
 |---|---|
 | `source/apps/omni.webrtc_monitor.kit` | Main Kit application (viewport + FlownexBridge extension) |
-| `source/apps/omni.webrtc_monitor.streaming.kit` | Streaming layer — enables WebRTC so the React front-end can connect |
+| `source/apps/omni.webrtc_monitor.streaming.kit` | Streaming layer — WebRTC only, no CAE |
+| `source/apps/omni.webrtc_monitor.cae_streaming.kit` | **Combined** Kit-CAE + WebRTC streaming app |
 | `source/extensions/omni.webrtc.flownex_bridge/` | Kit Python extension for USD prim messaging |
-| `premake5.lua` | Build script |
+| `vendor/kit-cae/` | Expected clone location for the kit-cae source |
+| `premake5.lua` | Build script (includes kit-cae prebuild_link) |
 | `repo.toml` | Repository tool configuration |
 | `repo.sh` / `repo.bat` | Linux / Windows launchers |
 
-### Quick integration
+### Quick start — WebRTC only
 
-1. **Clone the official kit-app-template** (provides the build toolchain):
+1. Clone [kit-app-template](https://github.com/NVIDIA-Omniverse/kit-app-template) and copy `kit-app-template/source/` and `kit-app-template/premake5.lua` into the clone root.
+2. `./repo.sh build` then `./repo.sh launch --app apps/omni.webrtc_monitor.streaming.kit`
+3. `npm start` from this repo — click **▶ Connect Omniverse Stream**.
 
-   ```bash
-   git clone https://github.com/NVIDIA-Omniverse/kit-app-template.git
-   cd kit-app-template
-   ```
+### Quick start — WebRTC + Kit-CAE (full CAE)
 
-2. **Copy the integration files:**
+1. Clone [kit-app-template](https://github.com/NVIDIA-Omniverse/kit-app-template) and copy `kit-app-template/source/`, `kit-app-template/premake5.lua`, and `kit-app-template/vendor/` into the clone root.
+2. Clone Kit-CAE: `git clone https://github.com/RGoharimehr/kit-cae vendor/kit-cae`
+3. Build Kit-CAE: `cd vendor/kit-cae && ./repo.sh build -r && cd -`
+4. Build this project: `./repo.sh build`
+5. Launch: `./repo.sh launch --app apps/omni.webrtc_monitor.cae_streaming.kit`
+6. `npm start` from this repo — click **▶ Connect Omniverse Stream**.
 
-   ```bash
-   # From the webrtc-react repo root:
-   cp -r kit-app-template/source /path/to/kit-app-template/
-   ```
-
-3. **Build:**
-
-   ```bash
-   # Linux
-   ./repo.sh build
-
-   # Windows
-   .\repo.bat build
-   ```
-
-4. **Launch the streaming Kit app:**
-
-   ```bash
-   # Linux
-   ./repo.sh launch --app apps/omni.webrtc_monitor.streaming.kit
-
-   # Windows
-   .\repo.bat launch --app apps\omni.webrtc_monitor.streaming.kit
-   ```
-
-5. **Start the React front-end** (from this repo's root, in a separate terminal):
-
-   ```bash
-   npm start
-   ```
-
-6. Click **▶ Connect Omniverse Stream** in the browser dashboard. The default `stream.config.json` connects to `127.0.0.1:49100`.
-
-> See [`kit-app-template/README.md`](kit-app-template/README.md) for full details, architecture diagram, and troubleshooting.
+> See [`kit-app-template/README.md`](kit-app-template/README.md) for full details, architecture diagram, VTK variant, and troubleshooting.
 

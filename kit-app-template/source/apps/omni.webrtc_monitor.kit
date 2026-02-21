@@ -88,7 +88,17 @@ size = 16
 [settings.app.exts.folders]
 '++' = [
     "${app}/../exts",         # local source extensions (built into this folder)
+    "${app}/../apps",         # local app kit files (also needed for kit-cae omni.cae app discovery)
     "${app}/../extscache/",   # pre-cached registry extensions
+
+    # Kit-CAE paths — populated by premake5.lua prebuild_link when
+    # vendor/kit-cae is present. Safe to include even when kit-cae is absent.
+    "${app}/../kit-cae/apps",
+    "${app}/../kit-cae/exts",
+
+    # Fallback paths used during repo_precache_exts (before symlinks exist)
+    "./vendor/kit-cae/_build/${platform}/${config}/apps",
+    "./vendor/kit-cae/_build/${platform}/${config}/exts",
 ]
 
 [settings.app."omni.graph.scriptnode"]
