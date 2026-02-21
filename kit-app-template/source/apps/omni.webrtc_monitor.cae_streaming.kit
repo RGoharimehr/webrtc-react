@@ -5,23 +5,40 @@
 # This is the primary launch file when you want to:
 #   • Run the full Kit-CAE application (CAE data import, algorithms, rendering)
 #   • Stream the viewport to the React WebRTC dashboard at http://localhost:3000
+#   • Auto-start the React frontend + Python bridge on Kit app launch
 #   • Communicate with the React front-end via the FlownexBridge JSON channel
 #
+# Directory structure (webrtc-react as a subfolder of kit-cae):
+#   kit-cae/
+#   ├── webrtc-react/   ← this repo's contents
+#   │   ├── package.json
+#   │   ├── src/
+#   │   ├── flownex-bridge/
+#   │   └── kit-app-template/source/  ← copy these files into kit-cae/source/
+#   └── source/
+#       ├── apps/
+#       │   └── omni.webrtc_monitor.cae_streaming.kit  ← this file
+#       └── extensions/
+#           ├── omni.webrtc.flownex_bridge/
+#           └── omni.webrtc_monitor.startup/
+#
 # Prerequisites:
-#   1. Clone kit-cae into vendor/kit-cae:
-#        git clone https://github.com/RGoharimehr/kit-cae vendor/kit-cae
-#   2. Build kit-cae:
-#        Linux:   cd vendor/kit-cae && ./repo.sh build -r && cd ../..
-#        Windows: cd vendor\kit-cae && repo.bat build -r && cd ..\..
-#   3. Build this project:
-#        ./repo.sh build   (Linux)
-#        .\repo.bat build  (Windows)
-#   4. Launch:
-#        ./repo.sh launch --app apps/omni.webrtc_monitor.cae_streaming.kit  (Linux)
-#        .\repo.bat launch --app apps\omni.webrtc_monitor.cae_streaming.kit (Windows)
-#   5. Start the React front-end (from the webrtc-react repo root):
-#        npm start
-#   6. Click "Connect Omniverse Stream" in the browser dashboard.
+#   1. Place webrtc-react inside kit-cae:
+#        cd /path/to/kit-cae
+#        git clone https://github.com/RGoharimehr/webrtc-react webrtc-react
+#   2. Install webrtc-react Node.js dependencies:
+#        cd webrtc-react && npm install && cd ..
+#   3. Copy kit-app-template source files into kit-cae's source tree:
+#        cp -r webrtc-react/kit-app-template/source/apps/*.kit  source/apps/
+#        cp -r webrtc-react/kit-app-template/source/extensions/ source/extensions/
+#   4. Build kit-cae:
+#        Linux:   ./repo.sh build -r
+#        Windows: repo.bat build -r
+#   5. Launch — this single command starts BOTH Kit-CAE AND the React frontend:
+#        Linux:   ./repo.sh launch -n omni.webrtc_monitor.cae_streaming.kit
+#        Windows: repo.bat launch -n omni.webrtc_monitor.cae_streaming.kit
+#   6. Open http://localhost:3000 in your browser — the dashboard appears.
+#      Click "Connect Omniverse Stream" to attach the WebRTC stream.
 
 [package]
 title       = "WebRTC Monitor + CAE — Streaming"
@@ -44,6 +61,17 @@ keywords    = ["app", "cae", "webrtc", "flownex", "streaming", "simulation"]
 # Provides bi-directional JSON messaging between the React dashboard and the
 # USD stage (get_prim_property / prim_property_result protocol).
 "omni.webrtc.flownex_bridge" = {}
+
+# ── React frontend auto-start ─────────────────────────────────────────────────
+# Automatically runs `npm start` in the webrtc-react directory when this Kit
+# app launches, starting both the React dev server (port 3000) and the Python
+# bridge (port 8001).  On Kit shutdown the processes are cleanly terminated.
+# The extension auto-discovers the webrtc-react root when it is placed as a
+# subfolder inside kit-cae (e.g. kit-cae/webrtc-react/).
+# Override the path via:
+#   [settings.exts."omni.webrtc_monitor.startup"]
+#   webrtcRoot = "/absolute/path/to/webrtc-react"
+"omni.webrtc_monitor.startup" = {}
 
 [settings.app]
 fastShutdown = true

@@ -1,0 +1,26 @@
+[package]
+title       = "WebRTC Monitor Startup"
+description = "Automatically starts the React WebRTC Monitor frontend (React dev server + Python bridge) when the Kit application launches. On Kit shutdown the child processes are cleanly terminated."
+version     = "1.0.0"
+authors     = ["Flownex Bridge Team"]
+category    = "Simulation"
+keywords    = ["webrtc", "react", "startup", "bridge", "simulation"]
+
+[dependencies]
+"omni.kit.app" = {}
+
+# omni.webrtc_monitor.startup reads one optional carb setting:
+#
+#   /exts/omni.webrtc_monitor.startup/webrtcRoot  (string)
+#
+# Set this in your .kit file if auto-discovery does not find the webrtc-react
+# directory automatically:
+#
+#   [settings.exts."omni.webrtc_monitor.startup"]
+#   webrtcRoot = "/absolute/path/to/webrtc-react"
+#
+# If the setting is absent the extension walks up from its own installed path
+# looking for a directory that contains a package.json with "name": "webrtc-react".
+
+[[python.module]]
+name = "omni.webrtc_monitor.startup"

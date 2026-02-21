@@ -27,6 +27,11 @@ keywords    = ["experience", "app", "webrtc", "streaming"]
 # Livestream extension (Kit 105+: omni.kit.livestream.app wraps WebRTC)
 "omni.kit.livestream.app" = {}
 
+# Auto-start the React frontend + Python bridge when the Kit app launches.
+# The extension discovers the webrtc-react directory automatically when
+# webrtc-react is placed as a subfolder inside kit-cae.
+"omni.webrtc_monitor.startup" = {}
+
 [settings.app]
 fastShutdown = true
 name         = "Omniverse WebRTC Monitor Streaming"
