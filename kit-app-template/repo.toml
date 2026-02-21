@@ -1,0 +1,81 @@
+########################################################################################################################
+# repo.toml — Omniverse WebRTC Monitor
+#
+# Repository tool configuration for the Omniverse Kit App Template integration.
+# See https://github.com/NVIDIA-Omniverse/kit-app-template for toolchain docs.
+########################################################################################################################
+
+[repo]
+# Inherit Kit-template repo configuration from the NVIDIA toolchain.
+import_configs = [
+    "${root}/_repo/deps/repo_kit_tools/kit-template/repo.toml",
+    "${root}/_repo/deps/repo_kit_tools/kit-template/repo-external-app.toml",
+]
+
+name = "omni.webrtc_monitor"
+
+
+########################################################################################################################
+# Build
+########################################################################################################################
+
+[repo_build]
+fetch."platform:linux-x86_64".before_pull_commands = [
+    ["mkdir", "--parents", "${root}/source/apps"],
+]
+fetch."platform:windows-x86_64".before_pull_commands = [
+    ["powershell", "-Command", "New-Item -ItemType Directory -Path ${root}/source/apps -ErrorAction SilentlyContinue", ";", "Write-Host 'Done'"],
+]
+
+[repo_build.build]
+enabled = true
+"platform:windows-x86_64".enabled = false
+
+[repo_build.msbuild]
+link_host_toolchain = false
+
+[repo_build.fetch.pip]
+files_to_pull = [
+    "${root}/tools/deps/pip.toml"
+]
+licensing_enabled  = false
+publish_pip_cache  = false
+
+
+########################################################################################################################
+# Extension pre-cacher
+########################################################################################################################
+
+[repo_precache_exts]
+apps = []
+
+registries = [
+    { name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/${kit_version_major}/shared" },
+    { name = "kit/sdk",     url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
+    { name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
+]
+
+generated_app_path = "${root}/_build/apps/exts.deps.generated.kit"
+
+
+########################################################################################################################
+# Application launching
+########################################################################################################################
+
+[repo_launch]
+type_ordering = [
+    "ApplicationTemplate",
+    "ApplicationLayerTemplate",
+]
+
+[repo_launch_app]
+enabled = true
+
+[repo_package_app]
+enabled = true
+
+[repo_kit_package_container]
+package_cmd  = "_package"
+enabled      = true
+gui_cli      = true
+auto_generate = true

@@ -1,0 +1,116 @@
+# omni.webrtc_monitor.kit
+#
+# Omniverse Kit App Template — WebRTC Monitor application
+#
+# This Kit application renders a 3-D scene over WebRTC and communicates with
+# the React web dashboard via the omni.webrtc.flownex_bridge extension.
+#
+# To use:
+#   1. Clone https://github.com/NVIDIA-Omniverse/kit-app-template
+#   2. Copy the contents of this repo's kit-app-template/ directory into the
+#      clone root, then run:
+#        Linux:   ./repo.sh build && ./repo.sh launch
+#        Windows: .\repo.bat build && .\repo.bat launch
+#
+# For streaming to the React front-end, use omni.webrtc_monitor.streaming.kit
+# as the launch target instead.
+
+[package]
+title       = "Omniverse WebRTC Monitor"
+version     = "1.0.0"
+description = "Viewport-only Omniverse app that streams to a React web dashboard. The FlownexBridge extension handles bi-directional JSON messaging over the WebRTC channel."
+keywords    = ["app", "webrtc", "flownex", "streaming", "simulation"]
+
+[dependencies]
+# ── Core rendering ────────────────────────────────────────────────────────────
+"omni.hydra.rtx"           = {}
+"omni.kit.renderer.core"   = {}
+"omni.kit.uiapp"           = {}
+
+# ── Viewport ──────────────────────────────────────────────────────────────────
+"omni.kit.viewport.utility" = {}
+"omni.kit.viewport.window"  = {}
+
+# ── USD stage ─────────────────────────────────────────────────────────────────
+"omni.usd"     = {}
+"omni.kit.usd" = {}
+
+# ── Our custom messaging extension ────────────────────────────────────────────
+"omni.webrtc.flownex_bridge" = {}
+
+# ── Optional: animation / OmniGraph (needed for interactive USD scenes) ───────
+"omni.anim.timeline"     = {}
+"omni.graph.action"      = {}
+"omni.graph.nodes"       = {}
+"omni.graph.scriptnode"  = {}
+
+# ── Viewport picking (used by FlownexBridge for prim queries) ─────────────────
+"omni.kit.manipulator.selection" = {}
+
+[settings.app]
+titleVersion              = "1.0.0"
+name                      = "Omniverse WebRTC Monitor"
+fastShutdown              = true
+content.emptyStageOnStart = true          # start with an empty USD stage
+
+# WebRTC / Livestream settings
+livestream.allowResize = 1
+livestream.skipCapture = 1                # reduce latency for local streaming
+
+# Render resolution (matches React front-end default 1920×1080)
+renderer.resolution.width  = 1920
+renderer.resolution.height = 1080
+
+[settings.app.window]
+title  = "Omniverse WebRTC Monitor"
+width  = 1920
+height = 1080
+x      = -1
+y      = -1
+
+[settings.app.viewport.defaults]
+fillViewport          = true
+guide.grid.visible    = false
+guide.axis.visible    = false
+hud.visible           = false
+scene.cameras.visible = false
+scene.lights.visible  = false
+
+[settings.app.file]
+ignoreUnsavedOnExit = true
+
+[settings.app.font]
+file = "${fonts}/OpenSans-SemiBold.ttf"
+size = 16
+
+# Extension search paths
+# ${app} resolves to the directory that contains this .kit file at runtime.
+[settings.app.exts.folders]
+'++' = [
+    "${app}/../exts",         # local source extensions (built into this folder)
+    "${app}/../extscache/",   # pre-cached registry extensions
+]
+
+[settings.app."omni.graph.scriptnode"]
+opt_in = true
+
+[settings.crashreporter.data]
+experience = "Omniverse WebRTC Monitor"
+
+[settings]
+crashreporter.compressDumpFiles      = true
+renderer.enabled                     = "rtx"
+renderer.multiGpu.enabled            = true
+rendergraph.maxFramesInFlight        = 2
+rtx-transient.dlssg.enabled          = false
+rtx-transient.resourcemanager.enableTextureStreaming = true
+telemetry.enableAnonymousData        = true
+privacy.externalBuild                = true
+
+[settings.exts."omni.kit.renderer.core"]
+present.enabled             = true    # enable present thread
+present.presentAfterRendering = true  # wait for render before presenting
+
+[settings.exts."omni.appwindow"]
+listenF11 = false
+listenF7  = false

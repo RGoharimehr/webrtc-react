@@ -1,0 +1,69 @@
+# omni.webrtc_monitor.streaming.kit
+#
+# Streaming layer for the Omniverse WebRTC Monitor application.
+#
+# This file is the launch target when you want the Kit app to accept WebRTC
+# connections from the React front-end running at http://localhost:3000.
+#
+# It layers on top of omni.webrtc_monitor (the base app) and adds the Kit
+# livestream / streaming extensions that expose the WebRTC endpoint.
+#
+# Typical signalling port: 49100 (see stream.config.json in the repo root).
+#
+# Launch commands (from within the kit-app-template clone root):
+#   Linux:   ./repo.sh launch --app apps/omni.webrtc_monitor.streaming.kit
+#   Windows: .\repo.bat launch --app apps\omni.webrtc_monitor.streaming.kit
+
+[package]
+title       = "Omniverse WebRTC Monitor — Streaming"
+version     = "1.0.0"
+description = "Streaming configuration for the Omniverse WebRTC Monitor. Enables WebRTC so the React dashboard can connect."
+keywords    = ["experience", "app", "webrtc", "streaming"]
+
+[dependencies]
+# Pull in the base application
+"omni.webrtc_monitor" = {}
+
+# Livestream extension (Kit 105+: omni.kit.livestream.app wraps WebRTC)
+"omni.kit.livestream.app" = {}
+
+[settings.app]
+fastShutdown = true
+name         = "Omniverse WebRTC Monitor Streaming"
+
+# Match the React front-end default resolution
+renderer.resolution.width  = 1920
+renderer.resolution.height = 1080
+window.width               = 1920
+window.height              = 1080
+
+[settings]
+# Anti-aliasing: TAA (op=3) works well over streaming
+rtx.post.aa.op                  = 3
+rtx.verifyDriverVersion.enabled = false
+
+[settings.app.extensions]
+registryEnabled             = true
+supportedTargets.platform   = []   # skip platform check during build
+
+exclude = [
+    "omni.kit.developer.bundle",
+    "omni.kit.widget.cache_indicator",
+]
+
+[settings.app.exts]
+folders.'++' = [
+    "${app}/../exts",
+    "${app}/../apps",
+    "${app}/../extscache",
+]
+
+[settings.app.file]
+ignoreUnsavedOnExit = true
+
+# WebRTC signalling port (must match stream.config.json → local.signalingPort)
+[settings.exts."omni.services.streaming.manager"]
+signalingPort = 49100
+
+[settings.exts."omni.kit.livestream.webrtc"]
+signalingPort = 49100

@@ -28,6 +28,7 @@ A dark-themed React dashboard that overlays an engineering control panel on top 
 15. [Omniverse WebRTC Streaming Setup](#15-omniverse-webrtc-streaming-setup)
 16. [Troubleshooting](#16-troubleshooting)
 17. [License](#17-license)
+18. [Omniverse Kit App Template Integration](#18-omniverse-kit-app-template-integration)
 
 ---
 
@@ -190,6 +191,14 @@ webrtc-react/
 │       ├── flownex_direct.py  # Flownex via pythonnet (.NET COM)
 │       ├── ansys_stub.py      # Ansys stub (ready for PyFluent / pythonnet wiring)
 │       └── omniverse_stub.py  # Omniverse Kit stub (ready for Kit Python API wiring)
+├── omniverse-kit-extension/   # Standalone Kit extension (drop-in for any Kit app)
+│   └── exts/omni.webrtc.flownex_bridge/
+├── kit-app-template/          # Kit App Template integration (see Section 18)
+│   ├── source/apps/           # .kit app configuration files
+│   ├── source/extensions/     # omni.webrtc.flownex_bridge extension source
+│   ├── premake5.lua
+│   ├── repo.toml
+│   └── repo.sh / repo.bat
 ├── stream.config.json         # Omniverse WebRTC connection settings
 ├── package.json
 ├── .env                       # GENERATE_SOURCEMAP=false (suppresses NVIDIA lib warnings)
@@ -972,4 +981,67 @@ npm run verify
 ## 17. License
 
 MIT
+
+---
+
+## 18. Omniverse Kit App Template Integration
+
+The `kit-app-template/` directory in this repository contains all files needed to run the Omniverse Kit side of this project using the [NVIDIA Omniverse Kit App Template](https://github.com/NVIDIA-Omniverse/kit-app-template) build system.
+
+### What is inside `kit-app-template/`
+
+| Path | Purpose |
+|---|---|
+| `source/apps/omni.webrtc_monitor.kit` | Main Kit application (viewport + FlownexBridge extension) |
+| `source/apps/omni.webrtc_monitor.streaming.kit` | Streaming layer — enables WebRTC so the React front-end can connect |
+| `source/extensions/omni.webrtc.flownex_bridge/` | Kit Python extension for USD prim messaging |
+| `premake5.lua` | Build script |
+| `repo.toml` | Repository tool configuration |
+| `repo.sh` / `repo.bat` | Linux / Windows launchers |
+
+### Quick integration
+
+1. **Clone the official kit-app-template** (provides the build toolchain):
+
+   ```bash
+   git clone https://github.com/NVIDIA-Omniverse/kit-app-template.git
+   cd kit-app-template
+   ```
+
+2. **Copy the integration files:**
+
+   ```bash
+   # From the webrtc-react repo root:
+   cp -r kit-app-template/source /path/to/kit-app-template/
+   ```
+
+3. **Build:**
+
+   ```bash
+   # Linux
+   ./repo.sh build
+
+   # Windows
+   .\repo.bat build
+   ```
+
+4. **Launch the streaming Kit app:**
+
+   ```bash
+   # Linux
+   ./repo.sh launch --app apps/omni.webrtc_monitor.streaming.kit
+
+   # Windows
+   .\repo.bat launch --app apps\omni.webrtc_monitor.streaming.kit
+   ```
+
+5. **Start the React front-end** (from this repo's root, in a separate terminal):
+
+   ```bash
+   npm start
+   ```
+
+6. Click **▶ Connect Omniverse Stream** in the browser dashboard. The default `stream.config.json` connects to `127.0.0.1:49100`.
+
+> See [`kit-app-template/README.md`](kit-app-template/README.md) for full details, architecture diagram, and troubleshooting.
 
