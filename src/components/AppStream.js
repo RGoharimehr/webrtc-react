@@ -50,7 +50,9 @@ class AppStream extends Component {
             // ── Python / Aiortc path ─────────────────────────────────────────
             // Close any existing peer connection before creating a new one.
             if (_rtc.pc) {
-                try { _rtc.pc.close(); } catch (_) { /* ignore */ }
+                try { _rtc.pc.close(); } catch (error) {
+                    console.warn('Error closing previous RTCPeerConnection:', error);
+                }
                 _rtc.pc = null;
                 _rtc.dataChannel = null;
                 _rtc.isConnected = false;

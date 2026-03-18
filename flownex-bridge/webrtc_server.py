@@ -86,6 +86,10 @@ class _OmniverseVideoTrack(MediaStreamTrack):
         self._frame_index: int = 0
 
     async def recv(self) -> av.VideoFrame:  # type: ignore[override]
+        # The base class declares `recv()` returning `Frame`, but aiortc's
+        # concrete video tracks return `av.VideoFrame` specifically.  The
+        # ignore suppresses the type-checker complaint about the narrower
+        # return type while keeping the signature readable for callers.
         pts, time_base = await self.next_timestamp()
         self._frame_index += 1
 

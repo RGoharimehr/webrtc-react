@@ -5,7 +5,7 @@ import os
 import asyncio
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from webrtc_server import handle_offer, close_all
@@ -81,7 +81,7 @@ async def webrtc_offer(request: Request):
     offer_type: str = data.get("type", "offer")
 
     if not sdp:
-        return {"error": "Missing 'sdp' in request body"}
+        raise HTTPException(status_code=400, detail="Missing 'sdp' in request body")
 
     answer = await handle_offer(
         sdp=sdp,
