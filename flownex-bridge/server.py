@@ -5,8 +5,10 @@ import os
 import asyncio
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+
+from webrtc_server import handle_offer, close_all
 
 from state import BridgeState
 from adapters.flownex_direct import FlownexDirectAdapter
@@ -59,6 +61,40 @@ async def _safe_send(ws: WebSocket, msg: Dict[str, Any]) -> None:
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Python WebRTC signalling (aiortc)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.post("/webrtc/offer")
+async def webrtc_offer(request: Request):
+    """Accept a WebRTC SDP offer from the browser and return an SDP answer.
+
+    The browser creates an ``RTCPeerConnection`` with a data channel, sends its
+    offer to this endpoint, and receives the Python-side (aiortc) answer.  ICE
+    gathering completes server-side before the response is returned so the SDP
+    already contains all candidates — no trickle-ICE round trips are needed.
+    """
+    data = await request.json()
+    sdp: str = data.get("sdp", "")
+    offer_type: str = data.get("type", "offer")
+
+    if not sdp:
+        return {"error": "Missing 'sdp' in request body"}
+
+    answer = await handle_offer(
+        sdp=sdp,
+        offer_type=offer_type,
+        on_message=None,  # extend here to hook data-channel messages into state
+    )
+    return answer
+
+
+@app.on_event("shutdown")
+async def _on_shutdown() -> None:
+    """Close all active WebRTC peer connections on server shutdown."""
+    await close_all()
 
 
 @app.websocket("/ws")
