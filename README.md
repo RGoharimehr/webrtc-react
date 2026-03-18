@@ -25,7 +25,7 @@ A dark-themed React dashboard that overlays an engineering control panel on top 
 12. [Custom Extensions (loading .js / .css)](#12-custom-extensions-loading-js--css)
 13. [Configuration Files](#13-configuration-files)
 14. [Connecting a Real Backend](#14-connecting-a-real-backend)
-15. [Omniverse WebRTC Streaming Setup](#15-omniverse-webrtc-streaming-setup)
+15. [WebRTC Streaming Setup](#15-webrtc-streaming-setup)
 16. [Troubleshooting](#16-troubleshooting)
 17. [License](#17-license)
 
@@ -88,6 +88,7 @@ The two subsystems are **completely decoupled**. You can use the dashboard contr
 **Key design decisions:**
 
 - **One WebSocket connection** per browser tab, reconnecting automatically with exponential back-off.
+- **Python WebRTC server**: the default stream source (`"python_webrtc"`) uses [aiortc](https://github.com/aiortc/aiortc) running inside the same Python process as the bridge. The browser sends a standard SDP offer to `POST /webrtc/offer` and receives an SDP answer — no Node.js runtime is needed and no marshalling is required to share values between the stream and the simulation backend.
 - **Adapter pattern**: every backend implements the same `BaseAdapter` abstract class. Switching backends is one dropdown selection in the UI; no browser restart required.
 - **CSV-driven schema**: the list of controllable inputs and readable outputs is defined in two CSV files that you create alongside your simulation project, not hard-coded in the UI.
 - **`window.__bridgeAPI`**: the bridge API is always available in the browser global scope, so user-loaded JavaScript extensions can send and receive messages without modifying the source code.
@@ -104,14 +105,20 @@ cd webrtc-react
 # 2. Install Node dependencies
 npm install
 
-# 3. Install Python dependencies (in a virtual environment recommended)
+# 3. Install Python dependencies (virtual environment recommended)
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r flownex-bridge/requirements.txt
 
 # 4. Start everything (React + bridge server together)
 npm start
 ```
 
-Open **http://localhost:3000** — the dashboard appears immediately. Without a running simulation backend the bridge will show "NO BRIDGE" and the metrics panel will display simulated random data.
+Open **http://localhost:3000** — the dashboard appears immediately.
+
+The Python bridge (`flownex-bridge/server.py`) starts automatically on port **8001**. It serves both the simulation WebSocket (`ws://127.0.0.1:8001/ws`) and the WebRTC signalling endpoint (`http://127.0.0.1:8001/webrtc/offer`) used by the built-in Python WebRTC server ([aiortc](https://github.com/aiortc/aiortc)).
+
+Without a running simulation backend the bridge will show "NO BRIDGE" and the metrics panel will display simulated random data.
 
 ---
 
@@ -123,8 +130,11 @@ Open **http://localhost:3000** — the dashboard appears immediately. Without a 
 | npm | bundled with Node.js | |
 | Python | 3.9 or higher | https://python.org/ |
 | pip | bundled with Python | |
+| aiortc | ≥ 1.9 | Installed via `pip install -r requirements.txt` — powers the built-in Python WebRTC server |
+| av (PyAV) | ≥ 12.0 | Installed via `pip install -r requirements.txt` — video frame encoding for aiortc |
+| numpy | ≥ 1.24 | Installed via `pip install -r requirements.txt` — used by the stub video track |
 | (optional) pythonnet | latest | Required only for real Flownex integration |
-| (optional) NVIDIA Omniverse Kit | latest | Required for live 3-D stream |
+| (optional) NVIDIA Omniverse Kit | latest | Required for live 3-D stream from an Omniverse scene |
 | (optional) Ansys installation | any | Required for real Ansys integration |
 
 ---
@@ -153,6 +163,9 @@ pip install -r flownex-bridge/requirements.txt
 ```
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
+aiortc>=1.9.0
+av>=12.0.0
+numpy>=1.24.0
 ```
 
 ---
@@ -170,7 +183,9 @@ webrtc-react/
 │   │   └── useBridge.js       # React hook — manages WebSocket connection,
 │   │                          #   parses all incoming messages, exposes bridge API
 │   ├── components/
-│   │   ├── AppStream.js       # NVIDIA Omniverse WebRTC streaming component
+│   │   ├── AppStream.js       # WebRTC streaming component
+│   │   │                      #   python_webrtc source → native RTCPeerConnection
+│   │   │                      #   local source         → NVIDIA Omniverse library
 │   │   ├── DraggableResizable.js  # Draggable/resizable floating panel
 │   │   └── GraphsPanel.js     # Live metrics sparklines (reads bridge.state.outputs)
 │   └── tabs/
@@ -182,7 +197,10 @@ webrtc-react/
 │       ├── Configuration.js        # BUILD: backend selector + custom extensions
 │       └── ResultsMapping.js       # BUILD: USD prim mapping workflow
 ├── flownex-bridge/
-│   ├── server.py              # FastAPI app — WebSocket endpoint, message dispatcher
+│   ├── server.py              # FastAPI app — WebSocket endpoint, WebRTC signalling,
+│   │                          #   message dispatcher
+│   ├── webrtc_server.py       # Python WebRTC server (aiortc) — peer connection
+│   │                          #   manager, stub video track, data-channel relay
 │   ├── state.py               # BridgeState class + InputDef / OutputDef dataclasses
 │   ├── requirements.txt
 │   └── adapters/
@@ -190,7 +208,7 @@ webrtc-react/
 │       ├── flownex_direct.py  # Flownex via pythonnet (.NET COM)
 │       ├── ansys_stub.py      # Ansys stub (ready for PyFluent / pythonnet wiring)
 │       └── omniverse_stub.py  # Omniverse Kit stub (ready for Kit Python API wiring)
-├── stream.config.json         # Omniverse WebRTC connection settings
+├── stream.config.json         # WebRTC connection settings (source, server, port)
 ├── package.json
 ├── .env                       # GENERATE_SOURCEMAP=false (suppresses NVIDIA lib warnings)
 ├── verify-setup.js            # `npm run verify` — checks the installation
@@ -808,11 +826,15 @@ api.sendCustom("start_transient", { duration: 60, dt: 0.1 });
 
 ## 13. Configuration Files
 
-### `stream.config.json` — Omniverse WebRTC settings
+### `stream.config.json` — WebRTC stream settings
 
 ```json
 {
-  "source": "local",
+  "source": "python_webrtc",
+  "python_webrtc": {
+    "server": "127.0.0.1",
+    "port": 8001
+  },
   "local": {
     "server": "127.0.0.1",
     "signalingPort": 49100,
@@ -823,12 +845,16 @@ api.sendCustom("start_transient", { duration: 60, dt: 0.1 });
 
 | Key | Values | Description |
 |---|---|---|
-| `source` | `"local"` \| `"stream"` \| `"gfn"` | Stream source type |
-| `local.server` | IP address | Omniverse Kit host |
-| `local.signalingPort` | number | WebRTC signaling port (default 49100) |
+| `source` | `"python_webrtc"` \| `"local"` \| `"stream"` \| `"gfn"` | Active stream source |
+| `python_webrtc.server` | IP address | Host running the Python bridge server |
+| `python_webrtc.port` | number | Port the bridge server listens on (default `8001`) |
+| `local.server` | IP address | Host running NVIDIA Omniverse Kit (legacy path) |
+| `local.signalingPort` | number | WebRTC signaling port used by Omniverse Kit (default `49100`) |
 | `local.mediaPort` | number \| `null` | Media port (`null` = auto) |
 
-For cloud streaming (`gfn` or `stream`), fill in the respective section.
+**`"python_webrtc"` is the default source.** The browser connects to the Python aiortc server via `POST http://{server}:{port}/webrtc/offer`. No Node.js WebRTC library is loaded; data exchange between the stream and the simulation backend happens inside the same Python process with no marshalling overhead.
+
+Set `"source": "local"` to fall back to the legacy NVIDIA Omniverse NVST library path.
 
 ### `.env`
 
@@ -882,27 +908,90 @@ Wire up `flownex-bridge/adapters/omniverse_stub.py` using the [Omniverse Kit Pyt
 
 ---
 
-## 15. Omniverse WebRTC Streaming Setup
+## 15. WebRTC Streaming Setup
 
-The app can display a live 3-D scene rendered by NVIDIA Omniverse as the video background.
+The app can display a live video feed as the background. Two sources are supported.
 
-1. **Edit `stream.config.json`** with the IP and signaling port of your Omniverse Kit instance (default `127.0.0.1:49100`).
+---
 
-2. **Start Omniverse Kit** with the WebRTC streaming extension enabled.
+### 15.1 Python WebRTC server (default — recommended)
+
+The built-in Python WebRTC server (`flownex-bridge/webrtc_server.py`) is powered by [aiortc](https://github.com/aiortc/aiortc) and runs **inside the same Python process as the simulation bridge**, eliminating the marshalling overhead that arises when a separate Node.js runtime is used.
+
+#### How it works
+
+```
+Browser (RTCPeerConnection)          Python bridge (port 8001)
+──────────────────────────           ─────────────────────────
+addTransceiver("video", recvonly)
+createDataChannel("bridge")
+createOffer()
+                ──── POST /webrtc/offer ────►
+                                             setRemoteDescription
+                                             addTrack(_OmniverseVideoTrack)
+                                             createAnswer
+                                             wait for ICE gathering
+                ◄─── { sdp, type } ─────────
+setRemoteDescription
+[video frames arrive via ontrack]
+[messages via RTCDataChannel "bridge"]
+```
+
+#### Video track
+
+`_OmniverseVideoTrack` in `webrtc_server.py` is currently a **placeholder** that streams an animated colour-cycling test pattern. Replace it with an `aiortc.contrib.media.MediaPlayer` that consumes an RTSP/RTP feed from Omniverse Kit (or any other video source) to show real content:
+
+```python
+# flownex-bridge/webrtc_server.py — swap the stub track for a real relay
+
+from aiortc.contrib.media import MediaPlayer
+
+class _OmniverseVideoTrack(MediaStreamTrack):
+    kind = "video"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._player = MediaPlayer("rtsp://127.0.0.1:8554/live")
+        self._track = self._player.video
+
+    async def recv(self):
+        return await self._track.recv()
+```
+
+#### Data channel
+
+The browser's `RTCDataChannel` labelled `"bridge"` mirrors the WebSocket messaging protocol described in Section 9. Custom events sent from the Omniverse Kit extension are delivered here.
+
+#### Sending messages to the stream
+
+`AppStream.sendMessage(jsonString)` routes through the data channel when `source` is `"python_webrtc"`:
+
+```js
+AppStream.sendMessage(JSON.stringify({
+    event_type: "colorize",
+    payload: { property: "temperature", colormap: "turbo", min: 20, max: 90 }
+}));
+```
+
+---
+
+### 15.2 Legacy NVIDIA Omniverse NVST path (`source: "local"`)
+
+> **Use this path only if you need to connect to an Omniverse Kit NVST streaming server directly** (e.g., for multi-user sessions managed by Omniverse Nucleus).
+
+1. **Edit `stream.config.json`**, set `"source": "local"` and fill in the Omniverse Kit IP and signaling port (default `49100`).
+
+2. **Start Omniverse Kit** with the WebRTC streaming extension (`omni.kit.livestream.webrtc`) enabled.
 
 3. **Start the React app** (`npm start`).
 
 4. Click **▶ Connect Omniverse Stream** in the dashboard header.
 
-When the stream is running, the **Results Visualization** tab's "Apply to Omniverse" button sends colour-map commands to the Kit extension via `AppStream.sendMessage()`. Implement the `on_message` handler in your Kit extension to receive these.
-
-#### Using the real NVIDIA library
-
-The app ships with a local stub (`src/lib/omniverse-webrtc-stub.js`). To use the real library:
+The app ships with a local stub (`src/lib/omniverse-webrtc-stub.js`). To use the **real** NVIDIA library:
 
 1. Obtain access to the NVIDIA npm registry (`edge.urm.nvidia.com`).
-2. Remove the local `file:` dependency and install the real package.
-3. `AppStream.js` already imports from `@nvidia/omniverse-webrtc-streaming-library`, so no import changes are needed.
+2. Remove the local `file:` dependency in `package.json` and install the real package.
+3. `AppStream.js` already imports from `@nvidia/omniverse-webrtc-streaming-library` so no import changes are needed.
 
 Run `npm run check-stub` to confirm which library is active.
 
@@ -925,10 +1014,26 @@ Run `npm run check-stub` to confirm which library is active.
 
 ### Omniverse stream fails / NVST_R_BUSY
 
+- This error only applies to the legacy `"source": "local"` (NVIDIA NVST) path.
 - The app waits 2 seconds after `stop()` before reconnecting to avoid race conditions on the Omniverse server.
 - Verify Omniverse Kit is running and the WebRTC extension is enabled.
 - Check `stream.config.json` for correct IP/port.
 - If streaming from another machine, open ports 49100 (signaling) and the media port in the firewall.
+
+### Python WebRTC stream not connecting
+
+The default stream source (`"python_webrtc"`) uses the Python aiortc server that is bundled with the bridge.
+
+- Confirm the bridge is running: open http://127.0.0.1:8001/health — it should return `{"ok":true}`.
+- Confirm the signalling endpoint exists: `curl -X POST http://127.0.0.1:8001/webrtc/offer` should return an HTTP 422 (missing body), not a 404.
+- Ensure aiortc and its dependencies are installed: `pip install -r flownex-bridge/requirements.txt`.
+- Open the browser DevTools console and look for `[Python WebRTC]` log lines. A successful connection prints:
+  ```
+  [Python WebRTC] data channel open
+  [Python WebRTC] peer connection established
+  ```
+- If you see `Signalling server returned HTTP 500`, check the bridge terminal for Python stack traces.
+- If CORS blocks the POST request, ensure the React dev-server port (3000 or 3001) is listed in the `allow_origins` list in `flownex-bridge/server.py`.
 
 ### `react-scripts: not found`
 
