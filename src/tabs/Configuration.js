@@ -1,7 +1,54 @@
 // src/tabs/Configuration.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const Configuration = ({ bridge }) => {
+  // ── Flownex project fields ──────────────────────────────────────────────────
+  const [projectFile, setProjectFile] = useState("");
+  const [ioDirectory, setIoDirectory] = useState("");
+  const filePickerRef = useRef(null);
+  const dirPickerRef  = useRef(null);
+
+  const onFilePicked = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    // Use the real OS path when available (Electron / nwjs), else the file name.
+    const path = f.path || f.name;
+    setProjectFile(path);
+    addLog(`Project file selected: ${path}`);
+  };
+
+  const onDirPicked = (e) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    // webkitRelativePath looks like "FolderName/file.csv" — grab the top folder.
+    const rel  = files[0].webkitRelativePath || "";
+    const top  = rel.split("/")[0];
+    // Use real path when available (Electron), otherwise the top-folder name.
+    const path = files[0].path
+      ? files[0].path.split(/[/\\]/).slice(0, -1).join("/")
+      : top;
+    setIoDirectory(path);
+    addLog(`IO folder selected: ${path}`);
+  };
+
+  // Merge project fields into the JSON config textarea whenever they change.
+  const applyProjectFieldsToConfig = (projFile, ioDir) => {
+    setConfigText((prev) => {
+      try {
+        const obj = prev.trim() ? JSON.parse(prev) : {};
+        if (projFile !== undefined) obj.project_file  = projFile;
+        if (ioDir    !== undefined) obj.io_directory   = ioDir;
+        return JSON.stringify(obj, null, 2);
+      } catch {
+        return prev; // leave malformed JSON untouched
+      }
+    });
+    setConfigError("");
+  };
+
+  // Keep project fields in sync with backend config on load.
+  // (done in the existing bridge.config useEffect below)
+
   // Local editable config mirror (populated from bridge.config on load)
   const [configText, setConfigText] = useState("");
   const [configError, setConfigError] = useState("");
@@ -43,6 +90,9 @@ const Configuration = ({ bridge }) => {
     if (bridge?.config != null) {
       setConfigText(JSON.stringify(bridge.config, null, 2));
       setConfigError("");
+      // Populate project fields from backend config
+      if (bridge.config.project_file  != null) setProjectFile(bridge.config.project_file);
+      if (bridge.config.io_directory   != null) setIoDirectory(bridge.config.io_directory);
     }
   }, [bridge?.config]);
 
@@ -197,6 +247,103 @@ const Configuration = ({ bridge }) => {
             <button onClick={handleLoadInputs}>Load Inputs</button>
             <button onClick={handleLoadStaticInputs}>Load Static Inputs</button>
             <button onClick={handleLoadOutputs}>Load Outputs</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Flownex Project ── */}
+      <div className="collapsible">
+        <div className="collapsible-header">
+          <span className="collapsible-title">Flownex Project</span>
+          <span className="collapsible-icon expanded">▼</span>
+        </div>
+        <div className="collapsible-content">
+          {/* Hidden file pickers */}
+          <input
+            ref={filePickerRef}
+            type="file"
+            accept=".fnx,.proj,.flo,.zip,.json,*"
+            style={{ display: "none" }}
+            onChange={onFilePicked}
+          />
+          <input
+            ref={dirPickerRef}
+            type="file"
+            webkitdirectory="true"
+            directory="true"
+            multiple
+            style={{ display: "none" }}
+            onChange={onDirPicked}
+          />
+
+          {/* Project File */}
+          <div className="input-row" style={{ marginBottom: 10 }}>
+            <label className="input-label">Project File:</label>
+            <div style={{ flex: 1, display: "flex", gap: 6 }}>
+              <input
+                type="text"
+                value={projectFile}
+                onChange={(e) => {
+                  setProjectFile(e.target.value);
+                  applyProjectFieldsToConfig(e.target.value, undefined);
+                }}
+                placeholder="D:\Simulation\project.fnx"
+                style={{ flex: 1 }}
+              />
+              <button
+                onClick={() => filePickerRef.current?.click()}
+                title="Browse for project file"
+              >
+                Browse…
+              </button>
+            </div>
+          </div>
+
+          {/* IO Folder */}
+          <div className="input-row" style={{ marginBottom: 10 }}>
+            <label className="input-label">IO Folder:</label>
+            <div style={{ flex: 1, display: "flex", gap: 6 }}>
+              <input
+                type="text"
+                value={ioDirectory}
+                onChange={(e) => {
+                  setIoDirectory(e.target.value);
+                  applyProjectFieldsToConfig(undefined, e.target.value);
+                }}
+                placeholder="D:\Simulation\IOFiles"
+                style={{ flex: 1 }}
+              />
+              <button
+                onClick={() => dirPickerRef.current?.click()}
+                title="Browse for IO folder"
+              >
+                Browse…
+              </button>
+            </div>
+          </div>
+
+          <div style={{ color: "var(--text-secondary)", fontSize: 11, marginBottom: 8 }}>
+            Tip: use <em>Browse…</em> to pick a file/folder, or paste the full path directly.
+            Changes are reflected in the Config editor below and sent with <em>Set Config</em>.
+          </div>
+
+          <div className="button-group">
+            <button
+              onClick={() => {
+                applyProjectFieldsToConfig(projectFile, ioDirectory);
+                try {
+                  const obj = configText.trim() ? JSON.parse(configText) : {};
+                  obj.project_file  = projectFile;
+                  obj.io_directory  = ioDirectory;
+                  addLog("Sending flownex.set_config with project paths…");
+                  bridge?.setConfigRemote?.(obj);
+                } catch (e) {
+                  setConfigError("Invalid JSON: " + e.message);
+                }
+              }}
+            >
+              Apply Project Paths
+            </button>
           </div>
         </div>
       </div>
