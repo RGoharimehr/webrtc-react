@@ -44,7 +44,7 @@ const GeometricalDesign = ({ bridge }) => {
 
   // ---- Pull backend snapshot -> update UI ----
   useEffect(() => {
-    const backendStatic = bridge?.status?.inputs?.static;
+    const backendStatic = bridge?.state?.inputs?.static;
     if (!backendStatic) return;
 
     setGeometry((prev) => {
@@ -66,7 +66,7 @@ const GeometricalDesign = ({ bridge }) => {
 
       return changed ? next : prev;
     });
-  }, [bridge?.status?.inputs?.static]);
+  }, [bridge?.state?.inputs?.static]);
 
   const handleGeometryChange = (param, rawValue) => {
     const value =

@@ -1,8 +1,8 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import StreamConfig from '../stream.config.json';
-// Legacy: NVIDIA Omniverse WebRTC Streaming Library (used only for 'local' source)
-import { AppStreamer, StreamType } from '@nvidia/omniverse-webrtc-streaming-library';
+// NVIDIA Omniverse WebRTC Streaming Library (legacy 'local' source — uses stub)
+import { AppStreamer, StreamType } from '../lib/omniverse-webrtc-stub';
 
 // Delay before reconnecting when using the legacy 'local' (NVIDIA NVST) source.
 // The library Promise resolves client-side before the Omniverse NVST server
