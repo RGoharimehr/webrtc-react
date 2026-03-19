@@ -12,43 +12,41 @@ const Configuration = ({ bridge }) => {
   const onFilePicked = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    // f.path is only available in Electron/nwjs — browsers do NOT expose the
-    // real local path for security reasons.  In a plain browser, f.path is
-    // undefined and we fall back to f.name (just the filename, NOT a full path).
-    // If you need the real path, either run this app in Electron or type the
-    // full path directly in the text box below.
-    const path = f.path || f.name;
-    if (!f.path) {
+    if (f.path) {
+      // Electron / nwjs: real OS path is available.
+      setProjectFile(f.path);
+      applyProjectFieldsToConfig(f.path, ioDirectory);
+    } else {
+      // Plain browser: the File API does not expose the real local path.
+      // Do NOT populate the field with just the filename — it is useless as a path.
+      // The user must type the full path in the text field.
       addLog(
-        `⚠ Browser security: full path unavailable. Got filename only: "${path}". ` +
-        "Enter the full path manually or use an Electron build."
+        "⚠ Browser security: the local file path is not accessible in a standard browser. " +
+        "Enter the full project path manually in the text field, " +
+        "or run this app in an Electron shell."
       );
     }
-    setProjectFile(path);
-    applyProjectFieldsToConfig(path, undefined);
   };
 
   const onDirPicked = (e) => {
     const files = e.target.files;
     if (!files?.length) return;
-    // In Electron/nwjs, files[0].path gives the full OS path; we strip the
-    // filename to get the directory.  In a plain browser, webkitRelativePath
-    // gives "FolderName/file.csv" — we can only extract the top folder NAME,
-    // not the real absolute path.  Use the text box to enter the full path.
-    let path;
     if (files[0].path) {
-      path = files[0].path.split(/[/\\]/).slice(0, -1).join("/");
+      // Electron / nwjs: real OS path available — strip the filename to get the directory.
+      const dir = files[0].path.split(/[/\\]/).slice(0, -1).join("/");
+      setIoDirectory(dir);
+      applyProjectFieldsToConfig(projectFile, dir);
     } else {
-      const rel = files[0].webkitRelativePath || "";
-      path = rel.split("/")[0]; // folder name only — not a full path
+      // Plain browser: webkitRelativePath gives "FolderName/file.csv" — only
+      // the folder NAME, not its absolute path.  A folder name is useless as
+      // an IO directory path and must NOT be sent to the backend.
+      // The user must type the full directory path in the text field.
       addLog(
-        `⚠ Browser security: full directory path unavailable. ` +
-        `Got folder name only: "${path}". ` +
-        "Enter the full IO directory path manually or use an Electron build."
+        "⚠ Browser security: the local directory path is not accessible in a standard browser. " +
+        "Enter the full IO directory path manually in the text field, " +
+        "or run this app in an Electron shell."
       );
     }
-    setIoDirectory(path);
-    applyProjectFieldsToConfig(undefined, path);
   };
 
   // Merge project fields into the JSON config textarea whenever they change.
@@ -173,22 +171,22 @@ const Configuration = ({ bridge }) => {
   // ── Flownex action handlers ─────────────────────────────────────────────────
   const handleApplyConfigure = () => {
     applyProjectFieldsToConfig(projectFile, ioDirectory);
-    addLog(`Sending configure — project: "${projectFile}", ioDir: "${ioDirectory}", backend: "${backend}"…`);
+    addLog(`Sending flownex.set_config — project: "${projectFile}", ioDir: "${ioDirectory}", backend: "${backend}"…`);
     bridge?.configure?.(projectFile, ioDirectory, backend);
   };
 
   const handleOpenFlownex = () => {
-    addLog("Sending open_flownex…");
+    addLog("Sending flownex.open_flownex…");
     bridge?.openFlownex?.();
   };
 
   const handleOpenProject = () => {
-    addLog("Sending open_project…");
+    addLog("Sending flownex.open_project…");
     bridge?.openProject?.();
   };
 
   const handleCloseFlownex = () => {
-    addLog("Sending close_flownex…");
+    addLog("Sending flownex.close_flownex…");
     bridge?.closeFlownex?.();
   };
 
@@ -378,33 +376,34 @@ const Configuration = ({ bridge }) => {
 
           <div style={{ color: "var(--text-secondary)", fontSize: 11, marginBottom: 8 }}>
             ⚠ <strong>Browser limitation:</strong> the <em>Browse…</em> buttons can only
-            return the filename / folder name in a standard browser (not the full local path).
-            For a real path, type it directly in the text field, or run this app in an
-            Electron shell which provides <code>file.path</code>.
+            return the full path when running inside an Electron or nwjs shell
+            (which exposes <code>File.prototype.path</code>).
+            In a standard browser the local path is not accessible — use the
+            text fields to enter the full path manually.
           </div>
 
           {/* Configuration workflow actions */}
           <div className="button-group" style={{ flexWrap: "wrap", gap: 6 }}>
             <button
-              title="Send configure command: sets project path, IO directory, and backend on the server"
+              title="Send flownex.set_config to the Omniverse extension with project path, IO directory, and backend"
               onClick={handleApplyConfigure}
             >
               Apply Configure
             </button>
             <button
-              title="Open Flownex application and load the configured project (open_flownex)"
+              title="Send flownex.open_flownex to the Omniverse extension"
               onClick={handleOpenFlownex}
             >
               Open Flownex
             </button>
             <button
-              title="Open the configured project file in Flownex (open_project)"
+              title="Send flownex.open_project to the Omniverse extension"
               onClick={handleOpenProject}
             >
               Open Project
             </button>
             <button
-              title="Close the Flownex application (close_flownex)"
+              title="Send flownex.close_flownex to the Omniverse extension"
               onClick={handleCloseFlownex}
             >
               Close Flownex
@@ -415,8 +414,8 @@ const Configuration = ({ bridge }) => {
             Workflow: enter paths → <em>Apply Configure</em> → <em>Open Flownex</em> →
             <em> Open Project</em>. Use <em>Close Flownex</em> to shut down the application.
             <br />
-            Note: <em>Open Flownex</em> uses the <code>open_flownex</code> backend command
-            (backed by the same adapter call as <code>open_project</code>).
+            All commands use the Omniverse extension protocol
+            (<code>flownex.*</code> command format).
           </div>
         </div>
       </div>
