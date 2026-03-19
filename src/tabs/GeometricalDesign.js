@@ -180,28 +180,6 @@ const GeometricalDesign = ({ bridge }) => {
         </div>
       </div>
 
-      <div className="section">
-        <h2 className="section-title">Layout Configuration</h2>
-
-        <div className="input-row">
-          <label className="input-label">Rack Arrangement:</label>
-          <select style={{ width: "300px" }}>
-            <option>Hot Aisle / Cold Aisle</option>
-            <option>Perimeter Cooling</option>
-            <option>In-Row Cooling</option>
-            <option>Overhead Cooling</option>
-          </select>
-        </div>
-
-        <div className="input-row">
-          <label className="input-label">Floor Type:</label>
-          <select style={{ width: "300px" }}>
-            <option>Raised Floor</option>
-            <option>Slab Floor</option>
-            <option>Hybrid</option>
-          </select>
-        </div>
-      </div>
     </div>
   );
 };
