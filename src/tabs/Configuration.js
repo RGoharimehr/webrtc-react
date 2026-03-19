@@ -1,10 +1,23 @@
 // src/tabs/Configuration.js
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+// ── localStorage persistence ────────────────────────────────────────────────
+const STORAGE_KEY = "flownex_ui_config";
+
+const loadSaved = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
 
 const Configuration = ({ bridge }) => {
   // ── Flownex project fields ──────────────────────────────────────────────────
-  const [projectFile, setProjectFile] = useState("");
-  const [ioDirectory, setIoDirectory] = useState("");
+  // Lazy-initialise from localStorage so values survive page reloads.
+  const [projectFile, setProjectFile] = useState(() => loadSaved().projectFile ?? "");
+  const [ioDirectory, setIoDirectory] = useState(() => loadSaved().ioDirectory ?? "");
   const filePickerRef = useRef(null);
   const dirPickerRef  = useRef(null);
 
@@ -64,8 +77,42 @@ const Configuration = ({ bridge }) => {
   };
 
   // Local editable config mirror (populated from bridge.config on load)
-  const [configText, setConfigText] = useState("");
+  const [configText, setConfigText] = useState(() => loadSaved().configText ?? "");
   const [configError, setConfigError] = useState("");
+
+  // ── Persist fields to localStorage whenever they change ────────────────────
+  const [savedIndicator, setSavedIndicator] = useState(false);
+  const saveTimer = useRef(null);
+  const isFirstRender = useRef(true);
+
+  const persistConfig = useCallback((projFile, ioDir, cfgText) => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ projectFile: projFile, ioDirectory: ioDir, configText: cfgText })
+      );
+    } catch {
+      // localStorage unavailable (private browsing quota exceeded, etc.) — fail silently
+    }
+    // Show a brief "✓ Saved" flash
+    setSavedIndicator(true);
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => setSavedIndicator(false), 1500);
+  }, []);
+
+  useEffect(() => {
+    // Skip the very first render — values were just loaded from localStorage,
+    // so there is nothing new to save and we don't want a "✓ Saved" flash on load.
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    persistConfig(projectFile, ioDirectory, configText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectFile, ioDirectory, configText]);
+
+  // Clean up the save timer if the component unmounts while it is pending.
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
 
   const [logs, setLogs] = useState("Configuration panel ready.\n");
 
@@ -239,6 +286,11 @@ const Configuration = ({ bridge }) => {
       <div className="collapsible">
         <div className="collapsible-header">
           <span className="collapsible-title">Flownex Project</span>
+          {savedIndicator && (
+            <span style={{ fontSize: 11, color: "var(--success-green)", marginLeft: 8 }}>
+              ✓ Saved
+            </span>
+          )}
           <span className="collapsible-icon expanded">▼</span>
         </div>
         <div className="collapsible-content">
