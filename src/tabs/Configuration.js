@@ -5,7 +5,6 @@ const Configuration = ({ bridge }) => {
   // ── Flownex project fields ──────────────────────────────────────────────────
   const [projectFile, setProjectFile] = useState("");
   const [ioDirectory, setIoDirectory] = useState("");
-  const [backend, setBackend] = useState("flownex");
   const filePickerRef = useRef(null);
   const dirPickerRef  = useRef(null);
 
@@ -68,11 +67,6 @@ const Configuration = ({ bridge }) => {
   const [configText, setConfigText] = useState("");
   const [configError, setConfigError] = useState("");
 
-  // Custom extensions state
-  const [jsUrls, setJsUrls] = useState("");
-  const [cssUrls, setCssUrls] = useState("");
-  const [extLog, setExtLog] = useState("");
-
   const [logs, setLogs] = useState("Configuration panel ready.\n");
 
   const addLog = (message) => {
@@ -83,9 +77,6 @@ const Configuration = ({ bridge }) => {
       return lines.join("\n") + `[${timestamp}] ${message}\n`;
     });
   };
-
-  const addExtLog = (msg) =>
-    setExtLog((p) => p + `[${new Date().toLocaleTimeString()}] ${msg}\n`);
 
   // ── Connection / status ─────────────────────────────────────────────────────
   const flownexStatus = bridge?.flownexStatus;
@@ -108,7 +99,6 @@ const Configuration = ({ bridge }) => {
       // Populate project fields from backend config
       if (bridge.config.project_file  != null) setProjectFile(bridge.config.project_file);
       if (bridge.config.io_directory   != null) setIoDirectory(bridge.config.io_directory);
-      if (bridge.config.backend        != null) setBackend(bridge.config.backend);
     }
   }, [bridge?.config]);
 
@@ -171,8 +161,8 @@ const Configuration = ({ bridge }) => {
   // ── Flownex action handlers ─────────────────────────────────────────────────
   const handleApplyConfigure = () => {
     applyProjectFieldsToConfig(projectFile, ioDirectory);
-    addLog(`Sending flownex.set_config — project: "${projectFile}", ioDir: "${ioDirectory}", backend: "${backend}"…`);
-    bridge?.configure?.(projectFile, ioDirectory, backend);
+    addLog(`Sending flownex.set_config — project: "${projectFile}", ioDir: "${ioDirectory}"…`);
+    bridge?.configure?.(projectFile, ioDirectory, "flownex");
   };
 
   const handleOpenFlownex = () => {
@@ -188,50 +178,6 @@ const Configuration = ({ bridge }) => {
   const handleCloseFlownex = () => {
     addLog("Sending flownex.close_flownex…");
     bridge?.closeFlownex?.();
-  };
-
-  // ── Custom extensions ───────────────────────────────────────────────────────
-  const loadExtensions = () => {
-    const parseUrls = (raw) =>
-      raw
-        .split("\n")
-        .map((u) => u.trim())
-        .filter(Boolean);
-
-    parseUrls(cssUrls).forEach((url) => {
-      const escapedUrl = CSS.escape(url);
-      if (document.querySelector(`link[data-custom-ext][href="${escapedUrl}"]`)) {
-        addExtLog(`CSS already loaded: ${url}`);
-        return;
-      }
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = url;
-      link.setAttribute("data-custom-ext", "true");
-      link.onload = () => addExtLog(`CSS loaded: ${url}`);
-      link.onerror = () => addExtLog(`CSS load error: ${url}`);
-      document.head.appendChild(link);
-    });
-
-    parseUrls(jsUrls).forEach((url) => {
-      const escapedUrl = CSS.escape(url);
-      if (document.querySelector(`script[data-custom-ext][src="${escapedUrl}"]`)) {
-        addExtLog(`JS already loaded: ${url}`);
-        return;
-      }
-      console.warn("[Custom Extension] Loading user-supplied script:", url,
-        "— ensure this URL is from a trusted source.");
-      const script = document.createElement("script");
-      script.src = url;
-      script.setAttribute("data-custom-ext", "true");
-      script.onload = () => addExtLog(`JS loaded: ${url}`);
-      script.onerror = () => addExtLog(`JS load error: ${url}`);
-      document.head.appendChild(script);
-    });
-
-    if (!jsUrls.trim() && !cssUrls.trim()) {
-      addExtLog("No extension URLs provided.");
-    }
   };
 
   // ── Rendered state summary helpers ─────────────────────────────────────────
@@ -314,20 +260,6 @@ const Configuration = ({ bridge }) => {
             onChange={onDirPicked}
           />
 
-          {/* Backend selector */}
-          <div className="input-row" style={{ marginBottom: 10 }}>
-            <label className="input-label">Backend:</label>
-            <select
-              value={backend}
-              onChange={(e) => setBackend(e.target.value)}
-              style={{ flex: 1 }}
-            >
-              <option value="flownex">Flownex</option>
-              <option value="ansys">Ansys</option>
-              <option value="omniverse">Omniverse</option>
-            </select>
-          </div>
-
           {/* Project File */}
           <div className="input-row" style={{ marginBottom: 10 }}>
             <label className="input-label">Project File:</label>
@@ -385,7 +317,7 @@ const Configuration = ({ bridge }) => {
           {/* Configuration workflow actions */}
           <div className="button-group" style={{ flexWrap: "wrap", gap: 6 }}>
             <button
-              title="Send flownex.set_config to the Omniverse extension with project path, IO directory, and backend"
+              title="Send flownex.set_config to the Omniverse extension with project path and IO directory"
               onClick={handleApplyConfigure}
             >
               Apply Configure
@@ -460,78 +392,6 @@ const Configuration = ({ bridge }) => {
           )}
           <div className="button-group" style={{ marginTop: 8 }}>
             <button onClick={handleSetConfig}>Set Config</button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Custom Extensions ── */}
-      <div className="collapsible">
-        <div className="collapsible-header">
-          <span className="collapsible-title">Custom Extensions</span>
-          <span className="collapsible-icon expanded">▼</span>
-        </div>
-        <div className="collapsible-content">
-          <div style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 10 }}>
-            Load custom <code>.js</code> / <code>.css</code> files hosted on a local or remote
-            server. Loaded scripts have full access to{" "}
-            <code>window.__bridgeAPI</code>.{" "}
-            <span style={{ color: "var(--warning-yellow)" }}>
-              ⚠ Only load scripts from trusted sources.
-            </span>
-          </div>
-
-          <div className="input-row" style={{ alignItems: "flex-start" }}>
-            <label className="input-label" style={{ paddingTop: 4 }}>JS URLs (one per line):</label>
-            <textarea
-              value={jsUrls}
-              onChange={(e) => setJsUrls(e.target.value)}
-              placeholder={"http://localhost:9000/my-extension.js"}
-              rows={3}
-              style={{ flex: 1, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
-            />
-          </div>
-
-          <div className="input-row" style={{ alignItems: "flex-start" }}>
-            <label className="input-label" style={{ paddingTop: 4 }}>CSS URLs (one per line):</label>
-            <textarea
-              value={cssUrls}
-              onChange={(e) => setCssUrls(e.target.value)}
-              placeholder={"http://localhost:9000/my-styles.css"}
-              rows={2}
-              style={{ flex: 1, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
-            />
-          </div>
-
-          <div className="button-group" style={{ marginTop: 8, marginBottom: 8 }}>
-            <button onClick={loadExtensions}>Load Extensions</button>
-          </div>
-
-          {extLog && (
-            <textarea
-              readOnly
-              value={extLog}
-              rows={4}
-              style={{
-                width: "100%",
-                resize: "vertical",
-                fontFamily: "monospace",
-                fontSize: 11,
-                background: "rgba(0,0,0,0.35)",
-                color: "var(--text-secondary)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8,
-                padding: "6px 8px",
-              }}
-            />
-          )}
-
-          <div style={{ color: "var(--text-secondary)", fontSize: 11, marginTop: 8 }}>
-            <strong>Example custom script usage:</strong>
-            <pre style={{ marginTop: 4, padding: "6px 8px", background: "rgba(0,0,0,0.35)", borderRadius: 6, whiteSpace: "pre-wrap" }}>
-{`const api = window.__bridgeAPI;
-api.getStatus();
-api.setInputValue("Fan_Speed", 1200);`}
-            </pre>
           </div>
         </div>
       </div>
