@@ -138,16 +138,22 @@ const Configuration = ({ bridge }) => {
       ? "var(--success-green)"
       : "var(--error-red)";
 
-  // Keep configText in sync when backend config arrives
+  // Keep configText / project fields in sync when backend state arrives
   useEffect(() => {
-    if (bridge?.config != null) {
-      setConfigText(JSON.stringify(bridge.config, null, 2));
-      setConfigError("");
-      // Populate project fields from backend config
-      if (bridge.config.project_file  != null) setProjectFile(bridge.config.project_file);
-      if (bridge.config.io_directory   != null) setIoDirectory(bridge.config.io_directory);
+    if (bridge?.connectedProject != null && bridge.connectedProject !== "") {
+      setProjectFile(bridge.connectedProject);
+      applyProjectFieldsToConfig(bridge.connectedProject, undefined);
     }
-  }, [bridge?.config]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge?.connectedProject]);
+
+  useEffect(() => {
+    if (bridge?.ioDirectory != null && bridge.ioDirectory !== "") {
+      setIoDirectory(bridge.ioDirectory);
+      applyProjectFieldsToConfig(undefined, bridge.ioDirectory);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge?.ioDirectory]);
 
   // Reflect backend errors in logs
   useEffect(() => {
@@ -170,61 +176,50 @@ const Configuration = ({ bridge }) => {
   }, [flownexStatus?.state, flownexStatus?.message, flownexStatus?.progress]);
 
   // ── Backend command handlers ────────────────────────────────────────────────
-  const handleGetStatus = () => {
-    addLog("Requesting flownex.get_status…");
-    bridge?.getStatus?.();
-  };
-
-  const handleGetConfig = () => {
-    addLog("Requesting flownex.get_config…");
-    bridge?.getConfig?.();
+  const handleGetState = () => {
+    addLog("Requesting state from backend…");
+    bridge?.getState?.();
   };
 
   const handleSetConfig = () => {
     try {
       const parsed = JSON.parse(configText);
-      addLog("Sending flownex.set_config…");
-      bridge?.setConfigRemote?.(parsed);
+      addLog("Sending configure…");
+      bridge?.configure?.(
+        parsed.projectPath || parsed.project_file || projectFile || "",
+        parsed.ioDir || parsed.io_directory || ioDirectory || "",
+        parsed.backend || "flownex"
+      );
     } catch (e) {
       setConfigError("Invalid JSON: " + e.message);
     }
   };
 
-  const handleLoadInputs = () => {
-    addLog("Requesting flownex.load_inputs…");
-    bridge?.loadInputs?.();
-  };
-
-  const handleLoadStaticInputs = () => {
-    addLog("Requesting flownex.load_static_inputs…");
-    bridge?.loadStaticInputs?.();
-  };
-
-  const handleLoadOutputs = () => {
-    addLog("Requesting flownex.load_outputs…");
-    bridge?.loadOutputs?.();
-  };
-
   // ── Flownex action handlers ─────────────────────────────────────────────────
   const handleApplyConfigure = () => {
     applyProjectFieldsToConfig(projectFile, ioDirectory);
-    addLog(`Sending flownex.set_config — project: "${projectFile}", ioDir: "${ioDirectory}"…`);
+    addLog(`Sending configure — project: "${projectFile}", ioDir: "${ioDirectory}"…`);
     bridge?.configure?.(projectFile, ioDirectory, "flownex");
   };
 
   const handleOpenFlownex = () => {
-    addLog("Sending flownex.open_flownex…");
+    addLog("Sending open_flownex…");
     bridge?.openFlownex?.();
   };
 
   const handleOpenProject = () => {
-    addLog("Sending flownex.open_project…");
+    addLog("Sending open_project…");
     bridge?.openProject?.();
   };
 
+  const handleCloseProject = () => {
+    addLog("Sending close_project…");
+    bridge?.closeProject?.();
+  };
+
   const handleCloseFlownex = () => {
-    addLog("Sending flownex.close_flownex…");
-    bridge?.closeFlownex?.();
+    addLog("Sending close_app…");
+    bridge?.closeApp?.();
   };
 
   // ── Rendered state summary helpers ─────────────────────────────────────────
@@ -270,14 +265,7 @@ const Configuration = ({ bridge }) => {
           </div>
 
           <div className="button-group">
-            <button onClick={handleGetStatus}>Get Status</button>
-            <button onClick={handleGetConfig}>Get Config</button>
-          </div>
-
-          <div className="button-group" style={{ marginTop: 8 }}>
-            <button onClick={handleLoadInputs}>Load Inputs</button>
-            <button onClick={handleLoadStaticInputs}>Load Static Inputs</button>
-            <button onClick={handleLoadOutputs}>Load Outputs</button>
+            <button onClick={handleGetState}>Get State</button>
           </div>
         </div>
       </div>
@@ -369,25 +357,31 @@ const Configuration = ({ bridge }) => {
           {/* Configuration workflow actions */}
           <div className="button-group" style={{ flexWrap: "wrap", gap: 6 }}>
             <button
-              title="Send flownex.set_config to the Omniverse extension with project path and IO directory"
+              title="Send configure to the Omniverse extension with project path and IO directory"
               onClick={handleApplyConfigure}
             >
               Apply Configure
             </button>
             <button
-              title="Send flownex.open_flownex to the Omniverse extension"
+              title="Send open_flownex to the Omniverse extension"
               onClick={handleOpenFlownex}
             >
               Open Flownex
             </button>
             <button
-              title="Send flownex.open_project to the Omniverse extension"
+              title="Send open_project to the Omniverse extension"
               onClick={handleOpenProject}
             >
               Open Project
             </button>
             <button
-              title="Send flownex.close_flownex to the Omniverse extension"
+              title="Send close_project to the Omniverse extension"
+              onClick={handleCloseProject}
+            >
+              Close Project
+            </button>
+            <button
+              title="Send close_app to shut down Flownex"
               onClick={handleCloseFlownex}
             >
               Close Flownex
@@ -396,10 +390,8 @@ const Configuration = ({ bridge }) => {
 
           <div style={{ color: "var(--text-secondary)", fontSize: 11, marginTop: 8 }}>
             Workflow: enter paths → <em>Apply Configure</em> → <em>Open Flownex</em> →
-            <em> Open Project</em>. Use <em>Close Flownex</em> to shut down the application.
-            <br />
-            All commands use the Omniverse extension protocol
-            (<code>flownex.*</code> command format).
+            <em> Open Project</em>. Use <em>Close Project</em> to detach the project or
+            <em> Close Flownex</em> to shut down the application.
           </div>
         </div>
       </div>
@@ -421,7 +413,7 @@ const Configuration = ({ bridge }) => {
               setConfigText(e.target.value);
               setConfigError("");
             }}
-            placeholder='{"project_file": "", "io_directory": "", ...}'
+            placeholder='{"projectPath": "", "ioDir": "", "backend": "flownex", "solveOnChange": false}'
             rows={8}
             style={{
               width: "100%",
