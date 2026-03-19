@@ -11,12 +11,9 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "bridge": "cd flownex-bridge && python -m uvicorn server:app --host 127.0.0.1 --port 8001",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "verify": "node verify-setup.js",
-    "check-stub": "node check-stub-mode.js"
+    "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [

@@ -1,34 +1,64 @@
 // src/tabs/Configuration.js
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+// ── localStorage persistence ────────────────────────────────────────────────
+const STORAGE_KEY = "flownex_ui_config";
+
+const loadSaved = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
 
 const Configuration = ({ bridge }) => {
   // ── Flownex project fields ──────────────────────────────────────────────────
-  const [projectFile, setProjectFile] = useState("");
-  const [ioDirectory, setIoDirectory] = useState("");
+  // Lazy-initialise from localStorage so values survive page reloads.
+  const [projectFile, setProjectFile] = useState(() => loadSaved().projectFile ?? "");
+  const [ioDirectory, setIoDirectory] = useState(() => loadSaved().ioDirectory ?? "");
   const filePickerRef = useRef(null);
   const dirPickerRef  = useRef(null);
 
   const onFilePicked = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    // Use the real OS path when available (Electron / nwjs), else the file name.
-    const path = f.path || f.name;
-    setProjectFile(path);
-    addLog(`Project file selected: ${path}`);
+    if (f.path) {
+      // Electron / nwjs: real OS path is available.
+      setProjectFile(f.path);
+      applyProjectFieldsToConfig(f.path, ioDirectory);
+    } else {
+      // Plain browser: the File API does not expose the real local path.
+      // Do NOT populate the field with just the filename — it is useless as a path.
+      // The user must type the full path in the text field.
+      addLog(
+        "⚠ Browser security: the local file path is not accessible in a standard browser. " +
+        "Enter the full project path manually in the text field, " +
+        "or run this app in an Electron shell."
+      );
+    }
   };
 
   const onDirPicked = (e) => {
     const files = e.target.files;
     if (!files?.length) return;
-    // webkitRelativePath looks like "FolderName/file.csv" — grab the top folder.
-    const rel  = files[0].webkitRelativePath || "";
-    const top  = rel.split("/")[0];
-    // Use real path when available (Electron), otherwise the top-folder name.
-    const path = files[0].path
-      ? files[0].path.split(/[/\\]/).slice(0, -1).join("/")
-      : top;
-    setIoDirectory(path);
-    addLog(`IO folder selected: ${path}`);
+    if (files[0].path) {
+      // Electron / nwjs: real OS path available — strip the filename to get the directory.
+      const dir = files[0].path.split(/[/\\]/).slice(0, -1).join("/");
+      setIoDirectory(dir);
+      applyProjectFieldsToConfig(projectFile, dir);
+    } else {
+      // Plain browser: webkitRelativePath gives "FolderName/file.csv" — only
+      // the folder NAME, not its absolute path.  A folder name is useless as
+      // an IO directory path and must NOT be sent to the backend.
+      // The user must type the full directory path in the text field.
+      addLog(
+        "⚠ Browser security: the local directory path is not accessible in a standard browser. " +
+        "Enter the full IO directory path manually in the text field, " +
+        "or run this app in an Electron shell."
+      );
+    }
   };
 
   // Merge project fields into the JSON config textarea whenever they change.
@@ -46,17 +76,43 @@ const Configuration = ({ bridge }) => {
     setConfigError("");
   };
 
-  // Keep project fields in sync with backend config on load.
-  // (done in the existing bridge.config useEffect below)
-
   // Local editable config mirror (populated from bridge.config on load)
-  const [configText, setConfigText] = useState("");
+  const [configText, setConfigText] = useState(() => loadSaved().configText ?? "");
   const [configError, setConfigError] = useState("");
 
-  // Custom extensions state
-  const [jsUrls, setJsUrls] = useState("");
-  const [cssUrls, setCssUrls] = useState("");
-  const [extLog, setExtLog] = useState("");
+  // ── Persist fields to localStorage whenever they change ────────────────────
+  const [savedIndicator, setSavedIndicator] = useState(false);
+  const saveTimer = useRef(null);
+  const isFirstRender = useRef(true);
+
+  const persistConfig = useCallback((projFile, ioDir, cfgText) => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ projectFile: projFile, ioDirectory: ioDir, configText: cfgText })
+      );
+    } catch {
+      // localStorage unavailable (private browsing quota exceeded, etc.) — fail silently
+    }
+    // Show a brief "✓ Saved" flash
+    setSavedIndicator(true);
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => setSavedIndicator(false), 1500);
+  }, []);
+
+  useEffect(() => {
+    // Skip the very first render — values were just loaded from localStorage,
+    // so there is nothing new to save and we don't want a "✓ Saved" flash on load.
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    persistConfig(projectFile, ioDirectory, configText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectFile, ioDirectory, configText]);
+
+  // Clean up the save timer if the component unmounts while it is pending.
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
 
   const [logs, setLogs] = useState("Configuration panel ready.\n");
 
@@ -68,9 +124,6 @@ const Configuration = ({ bridge }) => {
       return lines.join("\n") + `[${timestamp}] ${message}\n`;
     });
   };
-
-  const addExtLog = (msg) =>
-    setExtLog((p) => p + `[${new Date().toLocaleTimeString()}] ${msg}\n`);
 
   // ── Connection / status ─────────────────────────────────────────────────────
   const flownexStatus = bridge?.flownexStatus;
@@ -85,16 +138,22 @@ const Configuration = ({ bridge }) => {
       ? "var(--success-green)"
       : "var(--error-red)";
 
-  // Keep configText in sync when backend config arrives
+  // Keep configText / project fields in sync when backend state arrives
   useEffect(() => {
-    if (bridge?.config != null) {
-      setConfigText(JSON.stringify(bridge.config, null, 2));
-      setConfigError("");
-      // Populate project fields from backend config
-      if (bridge.config.project_file  != null) setProjectFile(bridge.config.project_file);
-      if (bridge.config.io_directory   != null) setIoDirectory(bridge.config.io_directory);
+    if (bridge?.connectedProject != null && bridge.connectedProject !== "") {
+      setProjectFile(bridge.connectedProject);
+      applyProjectFieldsToConfig(bridge.connectedProject, undefined);
     }
-  }, [bridge?.config]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge?.connectedProject]);
+
+  useEffect(() => {
+    if (bridge?.ioDirectory != null && bridge.ioDirectory !== "") {
+      setIoDirectory(bridge.ioDirectory);
+      applyProjectFieldsToConfig(undefined, bridge.ioDirectory);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge?.ioDirectory]);
 
   // Reflect backend errors in logs
   useEffect(() => {
@@ -117,83 +176,50 @@ const Configuration = ({ bridge }) => {
   }, [flownexStatus?.state, flownexStatus?.message, flownexStatus?.progress]);
 
   // ── Backend command handlers ────────────────────────────────────────────────
-  const handleGetStatus = () => {
-    addLog("Requesting flownex.get_status…");
-    bridge?.getStatus?.();
-  };
-
-  const handleGetConfig = () => {
-    addLog("Requesting flownex.get_config…");
-    bridge?.getConfig?.();
+  const handleGetState = () => {
+    addLog("Requesting state from backend…");
+    bridge?.getState?.();
   };
 
   const handleSetConfig = () => {
     try {
       const parsed = JSON.parse(configText);
-      addLog("Sending flownex.set_config…");
-      bridge?.setConfigRemote?.(parsed);
+      addLog("Sending configure…");
+      bridge?.configure?.(
+        parsed.projectPath || parsed.project_file || projectFile || "",
+        parsed.ioDir || parsed.io_directory || ioDirectory || "",
+        parsed.backend || "flownex"
+      );
     } catch (e) {
       setConfigError("Invalid JSON: " + e.message);
     }
   };
 
-  const handleLoadInputs = () => {
-    addLog("Requesting flownex.load_inputs…");
-    bridge?.loadInputs?.();
+  // ── Flownex action handlers ─────────────────────────────────────────────────
+  const handleApplyConfigure = () => {
+    applyProjectFieldsToConfig(projectFile, ioDirectory);
+    addLog(`Sending configure — project: "${projectFile}", ioDir: "${ioDirectory}"…`);
+    bridge?.configure?.(projectFile, ioDirectory, "flownex");
   };
 
-  const handleLoadStaticInputs = () => {
-    addLog("Requesting flownex.load_static_inputs…");
-    bridge?.loadStaticInputs?.();
+  const handleOpenFlownex = () => {
+    addLog("Sending open_flownex…");
+    bridge?.openFlownex?.();
   };
 
-  const handleLoadOutputs = () => {
-    addLog("Requesting flownex.load_outputs…");
-    bridge?.loadOutputs?.();
+  const handleOpenProject = () => {
+    addLog("Sending open_project…");
+    bridge?.openProject?.();
   };
 
-  // ── Custom extensions ───────────────────────────────────────────────────────
-  const loadExtensions = () => {
-    const parseUrls = (raw) =>
-      raw
-        .split("\n")
-        .map((u) => u.trim())
-        .filter(Boolean);
+  const handleCloseProject = () => {
+    addLog("Sending close_project…");
+    bridge?.closeProject?.();
+  };
 
-    parseUrls(cssUrls).forEach((url) => {
-      const escapedUrl = CSS.escape(url);
-      if (document.querySelector(`link[data-custom-ext][href="${escapedUrl}"]`)) {
-        addExtLog(`CSS already loaded: ${url}`);
-        return;
-      }
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = url;
-      link.setAttribute("data-custom-ext", "true");
-      link.onload = () => addExtLog(`CSS loaded: ${url}`);
-      link.onerror = () => addExtLog(`CSS load error: ${url}`);
-      document.head.appendChild(link);
-    });
-
-    parseUrls(jsUrls).forEach((url) => {
-      const escapedUrl = CSS.escape(url);
-      if (document.querySelector(`script[data-custom-ext][src="${escapedUrl}"]`)) {
-        addExtLog(`JS already loaded: ${url}`);
-        return;
-      }
-      console.warn("[Custom Extension] Loading user-supplied script:", url,
-        "— ensure this URL is from a trusted source.");
-      const script = document.createElement("script");
-      script.src = url;
-      script.setAttribute("data-custom-ext", "true");
-      script.onload = () => addExtLog(`JS loaded: ${url}`);
-      script.onerror = () => addExtLog(`JS load error: ${url}`);
-      document.head.appendChild(script);
-    });
-
-    if (!jsUrls.trim() && !cssUrls.trim()) {
-      addExtLog("No extension URLs provided.");
-    }
+  const handleCloseFlownex = () => {
+    addLog("Sending close_app…");
+    bridge?.closeApp?.();
   };
 
   // ── Rendered state summary helpers ─────────────────────────────────────────
@@ -239,14 +265,7 @@ const Configuration = ({ bridge }) => {
           </div>
 
           <div className="button-group">
-            <button onClick={handleGetStatus}>Get Status</button>
-            <button onClick={handleGetConfig}>Get Config</button>
-          </div>
-
-          <div className="button-group" style={{ marginTop: 8 }}>
-            <button onClick={handleLoadInputs}>Load Inputs</button>
-            <button onClick={handleLoadStaticInputs}>Load Static Inputs</button>
-            <button onClick={handleLoadOutputs}>Load Outputs</button>
+            <button onClick={handleGetState}>Get State</button>
           </div>
         </div>
       </div>
@@ -255,6 +274,11 @@ const Configuration = ({ bridge }) => {
       <div className="collapsible">
         <div className="collapsible-header">
           <span className="collapsible-title">Flownex Project</span>
+          {savedIndicator && (
+            <span style={{ fontSize: 11, color: "var(--success-green)", marginLeft: 8 }}>
+              ✓ Saved
+            </span>
+          )}
           <span className="collapsible-icon expanded">▼</span>
         </div>
         <div className="collapsible-content">
@@ -287,19 +311,19 @@ const Configuration = ({ bridge }) => {
                   setProjectFile(e.target.value);
                   applyProjectFieldsToConfig(e.target.value, undefined);
                 }}
-                placeholder="D:\Simulation\project.fnx"
+                placeholder="D:\Simulation\project.flnx  (enter full path)"
                 style={{ flex: 1 }}
               />
               <button
                 onClick={() => filePickerRef.current?.click()}
-                title="Browse for project file"
+                title="Browse — full path only available in Electron; plain browser returns filename only"
               >
                 Browse…
               </button>
             </div>
           </div>
 
-          {/* IO Folder */}
+          {/* IO Folder (directory path, not a file) */}
           <div className="input-row" style={{ marginBottom: 10 }}>
             <label className="input-label">IO Folder:</label>
             <div style={{ flex: 1, display: "flex", gap: 6 }}>
@@ -310,12 +334,12 @@ const Configuration = ({ bridge }) => {
                   setIoDirectory(e.target.value);
                   applyProjectFieldsToConfig(undefined, e.target.value);
                 }}
-                placeholder="D:\Simulation\IOFiles"
+                placeholder="D:\Simulation\IOFiles  (enter full directory path)"
                 style={{ flex: 1 }}
               />
               <button
                 onClick={() => dirPickerRef.current?.click()}
-                title="Browse for IO folder"
+                title="Browse for IO folder — full path only available in Electron; plain browser returns folder name only"
               >
                 Browse…
               </button>
@@ -323,27 +347,51 @@ const Configuration = ({ bridge }) => {
           </div>
 
           <div style={{ color: "var(--text-secondary)", fontSize: 11, marginBottom: 8 }}>
-            Tip: use <em>Browse…</em> to pick a file/folder, or paste the full path directly.
-            Changes are reflected in the Config editor below and sent with <em>Set Config</em>.
+            ⚠ <strong>Browser limitation:</strong> the <em>Browse…</em> buttons can only
+            return the full path when running inside an Electron or nwjs shell
+            (which exposes <code>File.prototype.path</code>).
+            In a standard browser the local path is not accessible — use the
+            text fields to enter the full path manually.
           </div>
 
-          <div className="button-group">
+          {/* Configuration workflow actions */}
+          <div className="button-group" style={{ flexWrap: "wrap", gap: 6 }}>
             <button
-              onClick={() => {
-                applyProjectFieldsToConfig(projectFile, ioDirectory);
-                try {
-                  const obj = configText.trim() ? JSON.parse(configText) : {};
-                  obj.project_file  = projectFile;
-                  obj.io_directory  = ioDirectory;
-                  addLog("Sending flownex.set_config with project paths…");
-                  bridge?.setConfigRemote?.(obj);
-                } catch (e) {
-                  setConfigError("Invalid JSON: " + e.message);
-                }
-              }}
+              title="Send configure to the Omniverse extension with project path and IO directory"
+              onClick={handleApplyConfigure}
             >
-              Apply Project Paths
+              Apply Configure
             </button>
+            <button
+              title="Send open_flownex to the Omniverse extension"
+              onClick={handleOpenFlownex}
+            >
+              Open Flownex
+            </button>
+            <button
+              title="Send open_project to the Omniverse extension"
+              onClick={handleOpenProject}
+            >
+              Open Project
+            </button>
+            <button
+              title="Send close_project to the Omniverse extension"
+              onClick={handleCloseProject}
+            >
+              Close Project
+            </button>
+            <button
+              title="Send close_app to shut down Flownex"
+              onClick={handleCloseFlownex}
+            >
+              Close Flownex
+            </button>
+          </div>
+
+          <div style={{ color: "var(--text-secondary)", fontSize: 11, marginTop: 8 }}>
+            Workflow: enter paths → <em>Apply Configure</em> → <em>Open Flownex</em> →
+            <em> Open Project</em>. Use <em>Close Project</em> to detach the project or
+            <em> Close Flownex</em> to shut down the application.
           </div>
         </div>
       </div>
@@ -365,7 +413,7 @@ const Configuration = ({ bridge }) => {
               setConfigText(e.target.value);
               setConfigError("");
             }}
-            placeholder='{"project_file": "", "io_directory": "", ...}'
+            placeholder='{"projectPath": "", "ioDir": "", "backend": "flownex", "solveOnChange": false}'
             rows={8}
             style={{
               width: "100%",
@@ -388,78 +436,6 @@ const Configuration = ({ bridge }) => {
           )}
           <div className="button-group" style={{ marginTop: 8 }}>
             <button onClick={handleSetConfig}>Set Config</button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Custom Extensions ── */}
-      <div className="collapsible">
-        <div className="collapsible-header">
-          <span className="collapsible-title">Custom Extensions</span>
-          <span className="collapsible-icon expanded">▼</span>
-        </div>
-        <div className="collapsible-content">
-          <div style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 10 }}>
-            Load custom <code>.js</code> / <code>.css</code> files hosted on a local or remote
-            server. Loaded scripts have full access to{" "}
-            <code>window.__bridgeAPI</code>.{" "}
-            <span style={{ color: "var(--warning-yellow)" }}>
-              ⚠ Only load scripts from trusted sources.
-            </span>
-          </div>
-
-          <div className="input-row" style={{ alignItems: "flex-start" }}>
-            <label className="input-label" style={{ paddingTop: 4 }}>JS URLs (one per line):</label>
-            <textarea
-              value={jsUrls}
-              onChange={(e) => setJsUrls(e.target.value)}
-              placeholder={"http://localhost:9000/my-extension.js"}
-              rows={3}
-              style={{ flex: 1, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
-            />
-          </div>
-
-          <div className="input-row" style={{ alignItems: "flex-start" }}>
-            <label className="input-label" style={{ paddingTop: 4 }}>CSS URLs (one per line):</label>
-            <textarea
-              value={cssUrls}
-              onChange={(e) => setCssUrls(e.target.value)}
-              placeholder={"http://localhost:9000/my-styles.css"}
-              rows={2}
-              style={{ flex: 1, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
-            />
-          </div>
-
-          <div className="button-group" style={{ marginTop: 8, marginBottom: 8 }}>
-            <button onClick={loadExtensions}>Load Extensions</button>
-          </div>
-
-          {extLog && (
-            <textarea
-              readOnly
-              value={extLog}
-              rows={4}
-              style={{
-                width: "100%",
-                resize: "vertical",
-                fontFamily: "monospace",
-                fontSize: 11,
-                background: "rgba(0,0,0,0.35)",
-                color: "var(--text-secondary)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8,
-                padding: "6px 8px",
-              }}
-            />
-          )}
-
-          <div style={{ color: "var(--text-secondary)", fontSize: 11, marginTop: 8 }}>
-            <strong>Example custom script usage:</strong>
-            <pre style={{ marginTop: 4, padding: "6px 8px", background: "rgba(0,0,0,0.35)", borderRadius: 6, whiteSpace: "pre-wrap" }}>
-{`const api = window.__bridgeAPI;
-api.getStatus();
-api.setInputValue("Fan_Speed", 1200);`}
-            </pre>
           </div>
         </div>
       </div>

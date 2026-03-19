@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 
-const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => {
+const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef, bridge }) => {
   const [xAxis, setXAxis] = useState('time');
   const [isRecording, setIsRecording] = useState(false);
   const [sampleCount, setSampleCount] = useState(0);
@@ -18,7 +18,6 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
       return;
     }
 
-    // Check if at least one variable is selected
     const hasSelectedVariable = Object.values(plottingVariables).some(v => v);
     if (!hasSelectedVariable) {
       alert('Please select at least one Y-axis variable to record.');
@@ -29,7 +28,6 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
     setSampleCount(0);
     setIsRecording(true);
 
-    // Start recording samples every 500ms
     recordingIntervalRef.current = setInterval(() => {
       if (graphsApiRef.current) {
         const data = graphsApiRef.current.getCurrentData();
@@ -52,31 +50,21 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
       return;
     }
 
-    // Export to XLSX
     await exportToXLSX(recordedDataRef.current);
   };
 
   const exportToXLSX = async (data) => {
-    // Prepare data for Excel
     const rows = data.map(sample => {
       const row = {};
-      
-      // Add X-axis data
-      switch (xAxis) {
-        case 'time':
-          row['Time [s]'] = sample.time.toFixed(2);
-          break;
-        case 'iteration':
-          row['Iteration'] = sample.iteration;
-          break;
-        case 'distance':
-          row['Distance [m]'] = sample.distance.toFixed(2);
-          break;
-        default:
-          row['Time [s]'] = sample.time.toFixed(2);
+
+      // X-axis column
+      if (xAxis === 'iteration') {
+        row['Iteration'] = sample.iteration;
+      } else {
+        row['Time [s]'] = sample.time.toFixed(2);
       }
 
-      // Add Y-axis data for selected variables
+      // Y-axis columns for selected variables
       if (plottingVariables.temperature) {
         row['Temperature [°C]'] = sample.temperature.toFixed(2);
       }
@@ -96,20 +84,17 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
       return row;
     });
 
-    // Create workbook and worksheet
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Recording');
 
-    // Generate filename with timestamp (format: YYYY-MM-DD_HH-mm-ss)
     const now = new Date();
     const timestamp = now.toISOString()
-      .replace(/:/g, '-')      // Replace colons with hyphens
-      .replace(/\..+/, '')     // Remove milliseconds
-      .replace('T', '_');      // Replace T with underscore
+      .replace(/:/g, '-')
+      .replace(/\..+/, '')
+      .replace('T', '_');
     const filename = `omnicool_recording_${timestamp}.xlsx`;
 
-    // Try File System Access API first (modern browsers)
     if (window.showSaveFilePicker) {
       try {
         const handle = await window.showSaveFilePicker({
@@ -119,22 +104,18 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
             accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
           }]
         });
-
         const writable = await handle.createWritable();
         const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
         await writable.write(buffer);
         await writable.close();
-
         alert(`Recording saved successfully! ${recordedDataRef.current.length} samples exported.`);
       } catch (err) {
         if (err.name !== 'AbortError') {
           console.error('Error saving file:', err);
-          // Fallback to browser download
           fallbackDownload(workbook, filename);
         }
       }
     } else {
-      // Fallback for older browsers
       fallbackDownload(workbook, filename);
     }
   };
@@ -215,7 +196,7 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
         <h2 className="section-title">X-Axis Selection</h2>
         <div className="input-row">
           <label className="input-label">X-Axis Variable:</label>
-          <select 
+          <select
             value={xAxis}
             onChange={(e) => setXAxis(e.target.value)}
             style={{ flex: 1 }}
@@ -223,14 +204,13 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
           >
             <option value="time">Time [s]</option>
             <option value="iteration">Iteration Number</option>
-            <option value="distance">Distance [m]</option>
           </select>
         </div>
       </div>
 
       <div className="section">
         <h2 className="section-title">Data Recorder</h2>
-        
+
         {isRecording && (
           <div style={{
             background: 'rgba(134, 239, 71, 0.1)',
@@ -246,7 +226,7 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
             <span style={{ color: 'var(--success-green)', fontWeight: 600 }}>
               Recording in progress...
             </span>
-            <span style={{ 
+            <span style={{
               marginLeft: 'auto',
               color: 'var(--text-primary)',
               fontSize: '14px',
@@ -259,28 +239,18 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
 
         <div className="button-group">
           {!isRecording ? (
-            <button 
-              className="success" 
-              onClick={startRecording}
-            >
+            <button className="success" onClick={startRecording}>
               ▶ Start Recording
             </button>
           ) : (
-            <button 
-              className="warning" 
-              onClick={stopRecording}
-            >
+            <button className="warning" onClick={stopRecording}>
               ■ Stop Recording & Export
             </button>
           )}
         </div>
 
         {!isRecording && sampleCount > 0 && (
-          <div style={{
-            marginTop: '12px',
-            color: 'var(--text-secondary)',
-            fontSize: '13px'
-          }}>
+          <div style={{ marginTop: '12px', color: 'var(--text-secondary)', fontSize: '13px' }}>
             Last recording: {sampleCount} samples captured
           </div>
         )}
@@ -288,7 +258,8 @@ const Plotting = ({ plottingVariables, setPlottingVariables, graphsApiRef }) => 
 
       {!isRecording && (
         <div className="warning-message">
-          ℹ️ Select variables and click "Start Recording" to begin capturing live data. 
+          ℹ️ Select variables and click "Start Recording" to begin capturing{' '}
+          {bridge?.connected ? 'live bridge' : 'simulated'} data.
           The recording will include all selected Y-axis variables sampled at 2 Hz (500ms intervals).
           When you stop, an Excel file will be exported with the format: omnicool_recording_YYYY-MM-DD_HH-mm-ss.xlsx
         </div>

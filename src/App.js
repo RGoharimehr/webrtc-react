@@ -65,6 +65,24 @@ function HoldRing({ x, y, pct }) {
   );
 }
 
+// ── Key-metrics helpers ────────────────────────────────────────────────────
+// Try multiple possible key names for each metric (most-specific first),
+// returning the first finite number found in the outputs dict, or null.
+function pickOutput(outputs, keys) {
+  if (!outputs) return null;
+  for (const k of keys) {
+    const v = parseFloat(outputs[k]);
+    if (Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+function fmtNum(v, decimals = 1) {
+  if (v === null || v === undefined) return "N/A";
+  return v.toFixed(decimals);
+}
+// ─────────────────────────────────────────────────────────────────────────
+
 export default function App() {
   // ✅ hooks must be INSIDE the component
   const bridge = useBridge();
@@ -414,53 +432,59 @@ export default function App() {
   // ─────────────────────────────────────────────────────────────────────────
 
   const renderTabContent = () => {
-    if (activeMode === "AI") {
-      return (
-        <div className="section">
+    // All named tab components are kept permanently mounted so their local state
+    // (form values, logs, etc.) survives switching between tabs and between modes.
+    // Only the active tab is made visible via CSS; the rest stay hidden.
+    const tabComponents = {
+      "Operating Conditions": <OperatingConditions bridge={bridge} />,
+      "Geometrical Design": <GeometricalDesign bridge={bridge} />,
+      "Results Visualization": (
+        <ResultsVisualization
+          bridge={bridge}
+          legendVar={legendVar}
+          setLegendVar={setLegendVar}
+          legendPreset={legendPreset}
+          setLegendPreset={setLegendPreset}
+          legendVariables={LEGEND_VARIABLES}
+          legendPresets={LEGEND_PRESETS}
+          effectiveMin={effectiveMin}
+          effectiveMax={effectiveMax}
+        />
+      ),
+      "Plotting": (
+        <Plotting
+          plottingVariables={plottingVariables}
+          setPlottingVariables={setPlottingVariables}
+          graphsApiRef={graphsApiRef}
+          bridge={bridge}
+        />
+      ),
+      "CFD Analysis": <CFDAnalysis bridge={bridge} />,
+      "Configuration": <Configuration bridge={bridge} />,
+      "Results Mapping": <ResultsMapping bridge={bridge} />,
+    };
+
+    return (
+      <>
+        {/* AI mode panel */}
+        <div style={{ display: activeMode === "AI" ? "block" : "none" }} className="section">
           <h2 className="section-title">AI</h2>
           <div style={{ color: "var(--text-secondary)", fontSize: "14px" }}>
             AI workflow UI placeholder (surrogate, optimization, agent, etc.)
           </div>
         </div>
-      );
-    }
 
-    switch (activeTab) {
-      case "Operating Conditions":
-        return <OperatingConditions bridge={bridge} />;
-      case "Geometrical Design":
-        return <GeometricalDesign bridge={bridge} />;
-      case "Results Visualization":
-        return (
-          <ResultsVisualization
-            bridge={bridge}
-            legendVar={legendVar}
-            setLegendVar={setLegendVar}
-            legendPreset={legendPreset}
-            setLegendPreset={setLegendPreset}
-            legendVariables={LEGEND_VARIABLES}
-            legendPresets={LEGEND_PRESETS}
-            effectiveMin={effectiveMin}
-            effectiveMax={effectiveMax}
-          />
-        );
-      case "Plotting":
-        return (
-          <Plotting
-            plottingVariables={plottingVariables}
-            setPlottingVariables={setPlottingVariables}
-            graphsApiRef={graphsApiRef}
-          />
-        );
-      case "CFD Analysis":
-        return <CFDAnalysis />;
-      case "Configuration":
-        return <Configuration bridge={bridge} />;
-      case "Results Mapping":
-        return <ResultsMapping />;
-      default:
-        return <OperatingConditions bridge={bridge} />;
-    }
+        {/* All named tab components — only one is visible at a time */}
+        {Object.entries(tabComponents).map(([tab, component]) => (
+          <div
+            key={tab}
+            style={{ display: activeMode !== "AI" && activeTab === tab ? "block" : "none" }}
+          >
+            {component}
+          </div>
+        ))}
+      </>
+    );
   };
 
   const stopActiveStream = () => {
@@ -722,23 +746,37 @@ export default function App() {
         <div className="hud-content">{renderTabContent()}</div>
       </DraggableResizable>
 
-      {/* Bottom strip */}
-      <div className="key-metrics-viewport">
-        <div className="kms-item">
-          <span className="kms-label">PUE</span>
-          <span className="kms-value">1.42</span>
-        </div>
-        <div className="kms-sep" />
-        <div className="kms-item">
-          <span className="kms-label">Tmax</span>
-          <span className="kms-value">68.5°C</span>
-        </div>
-        <div className="kms-sep" />
-        <div className="kms-item">
-          <span className="kms-label">Pcond</span>
-          <span className="kms-value">N/A</span>
-        </div>
-      </div>
+      {/* Bottom strip – live metrics from bridge.state.outputs */}
+      {(() => {
+        const out = bridge?.state?.outputs;
+        const itLoad  = pickOutput(out, ["it_load",  "IT_Load",  "itLoad",  "power"]);
+        const ambient = pickOutput(out, ["ambient_temperature", "ambient", "temperature"]);
+        const pue     = pickOutput(out, ["pue", "PUE"]);
+        return (
+          <div className="key-metrics-viewport">
+            <div className="kms-item">
+              <span className="kms-label">IT Load</span>
+              <span className="kms-value">
+                {itLoad !== null ? `${fmtNum(itLoad)} kW` : "N/A"}
+              </span>
+            </div>
+            <div className="kms-sep" />
+            <div className="kms-item">
+              <span className="kms-label">Ambient Temp</span>
+              <span className="kms-value">
+                {ambient !== null ? `${fmtNum(ambient)}°C` : "N/A"}
+              </span>
+            </div>
+            <div className="kms-sep" />
+            <div className="kms-item">
+              <span className="kms-label">PUE</span>
+              <span className="kms-value">
+                {pue !== null ? fmtNum(pue, 2) : "N/A"}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Hold-progress ring ── */}
       {holdRing.visible && (

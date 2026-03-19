@@ -1,13 +1,10 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 const OperatingConditions = ({ bridge }) => {
   const dynamicValues = bridge?.state?.inputs?.dynamic || {};
 
-  // Only show the Heat Rejection / Rack Power Script sliders in this tab (you can change filter)
-  const shown = useMemo(() => {
-    const inputs = bridge?.schema?.inputs || [];
-    return inputs.filter((i) => i.editType === "slider");
-  }, [bridge?.schema?.inputs]);
+  // Show all dynamic inputs from backend schema (sliders and checkboxes)
+  const shown = bridge?.dynamicInputDefs || [];
 
   // Local UI fallback for when bridge isn't ready yet
   const [local, setLocal] = useState({});
@@ -33,12 +30,39 @@ const OperatingConditions = ({ bridge }) => {
 
       {shown.length === 0 && (
         <div style={{ color: "var(--text-secondary)" }}>
-          No inputs received yet. Check bridge connection and that Inputs.csv is inside flownex-bridge/.
+          No dynamic inputs received yet. Connect to the backend and open a project.
         </div>
       )}
 
       {shown.map((i) => {
-        const v = dynamicValues[i.key] ?? local[i.key] ?? i.defaultValue ?? 0;
+        const rawVal = dynamicValues[i.key] ?? local[i.key] ?? i.defaultValue ?? 0;
+        const editType = (i.editType || "slider").toLowerCase();
+
+        if (editType === "checkbox") {
+          const checked = Boolean(rawVal);
+          return (
+            <div key={i.key} className="input-row">
+              <label className="input-label">
+                {i.description} {i.unit ? `[${i.unit}]` : ""}
+              </label>
+              <div className="input-control">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => setOne(i.key, e.target.checked)}
+                />
+                <span className="value-display">{checked ? "On" : "Off"}</span>
+              </div>
+              <div style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>
+                <div><b>Key:</b> {i.key}</div>
+                <div><b>Component:</b> {i.componentIdentifier}</div>
+              </div>
+            </div>
+          );
+        }
+
+        // Default: slider
+        const v = typeof rawVal === "number" ? rawVal : parseFloat(rawVal) || 0;
         const min = i.min ?? 0;
         const max = i.max ?? 100;
         const step = i.step ?? 1;
@@ -46,7 +70,7 @@ const OperatingConditions = ({ bridge }) => {
         return (
           <div key={i.key} className="input-row">
             <label className="input-label">
-              {i.description} [{i.unit || "-"}]
+              {i.description} {i.unit ? `[${i.unit}]` : ""}
             </label>
 
             <div className="input-control">

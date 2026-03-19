@@ -2,23 +2,23 @@
 //
 // Lightweight frontend client for the Omniverse extension backend.
 //
-// Message protocol
-// ─────────────────
-// Requests  (frontend → backend):
-//   { id, command: "flownex.<name>", payload: { … } }
+// Message protocol (bridge_ws_handlers.py)
+// ─────────────────────────────────────────
+// Outgoing (frontend → backend):
+//   { type: "<command>", id: "<uuid>", payload: { … } }
 //
-// Responses (backend → frontend):
-//   { id, command: "flownex.<name>", status: "ok"|"error", payload: { … } }
-//
-// Events pushed by the backend:
-//   { event: "flownex.<event_name>", payload: { … } }
-//
-// Legacy protocol (old Python bridge) is still handled for backward compat.
+// Incoming push messages (backend → frontend):
+//   { type: "schema",        payload: { inputs: [...], outputs: [...] } }
+//   { type: "state",         payload: { status, connected_project, io_directory, inputs, outputs, history, transientRunning } }
+//   { type: "status",        payload: { state, message, progress } }
+//   { type: "inputs_delta",  payload: { scope, key, value } }
+//   { type: "outputs_delta", payload: { key, value } }
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
+// Default: ws://127.0.0.1:8001  (Omniverse extension bridge WS port)
 const WS_URL =
-  process.env.REACT_APP_BACKEND_WS || "ws://127.0.0.1:8011/ws";
+  process.env.REACT_APP_BACKEND_WS || "ws://127.0.0.1:8001";
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY_MS = 1000;
 const MAX_RECONNECT_DELAY_MS = 30000;
@@ -35,12 +35,15 @@ export function useBridge() {
 
   // Omniverse extension backend data
   const [flownexStatus, setFlownexStatus] = useState(null);
-  const [config, setConfig] = useState(null);
   const [dynamicInputDefs, setDynamicInputDefs] = useState([]);
   const [staticInputDefs, setStaticInputDefs] = useState([]);
   const [outputDefs, setOutputDefs] = useState([]);
   const [inputValues, setInputValues] = useState({ dynamic: {}, static: {} });
   const [outputValues, setOutputValues] = useState({});
+  const [history, setHistory] = useState([]);
+  const [transientRunning, setTransientRunning] = useState(false);
+  const [connectedProject, setConnectedProject] = useState("");
+  const [ioDirectory, setIoDirectory] = useState("");
   const [errors, setErrors] = useState([]);
 
   // ── Low-level send ─────────────────────────────────────────────────────────
@@ -55,75 +58,6 @@ export function useBridge() {
 
   // ── Message dispatcher ─────────────────────────────────────────────────────
   const handleMessage = useCallback((m) => {
-    // ── New protocol: command responses ─────────────────────────────────────
-    if (m.command) {
-      if (m.status !== "ok") {
-        const err = m.error || m.message || `Command ${m.command} failed`;
-        setErrors((prev) => [...prev.slice(-49), err]);
-        return;
-      }
-      const payload = m.payload || {};
-      switch (m.command) {
-        case "flownex.get_status":
-          setFlownexStatus(payload);
-          break;
-        case "flownex.get_config":
-        case "flownex.set_config":
-          setConfig(payload);
-          break;
-        case "flownex.load_inputs":
-          setDynamicInputDefs(payload.inputs || []);
-          if (payload.values) {
-            setInputValues((prev) => ({ ...prev, dynamic: payload.values }));
-          }
-          break;
-        case "flownex.load_static_inputs":
-          setStaticInputDefs(payload.inputs || []);
-          if (payload.values) {
-            setInputValues((prev) => ({ ...prev, static: payload.values }));
-          }
-          break;
-        case "flownex.load_outputs":
-          setOutputDefs(payload.outputs || []);
-          if (payload.values) {
-            setOutputValues(payload.values);
-          }
-          break;
-        case "flownex.get_results":
-          if (payload.outputs) setOutputValues(payload.outputs);
-          break;
-        default:
-          break;
-      }
-      return;
-    }
-
-    // ── New protocol: backend-pushed events ──────────────────────────────────
-    if (m.event) {
-      const payload = m.payload || {};
-      switch (m.event) {
-        case "flownex.status_changed":
-          setFlownexStatus(payload);
-          break;
-        case "flownex.output_update":
-          setOutputValues((prev) => ({ ...prev, [payload.key]: payload.value }));
-          break;
-        case "flownex.input_update":
-          setInputValues((prev) => ({
-            ...prev,
-            dynamic: { ...prev.dynamic, [payload.key]: payload.value },
-          }));
-          break;
-        case "flownex.config_changed":
-          setConfig(payload);
-          break;
-        default:
-          break;
-      }
-      return;
-    }
-
-    // ── Legacy protocol: backward compat with old Python bridge ──────────────
     if (m.type === "schema") {
       const incoming = m.payload || { inputs: [], outputs: [] };
       const allInputs = incoming.inputs || [];
@@ -143,6 +77,19 @@ export function useBridge() {
         setInputValues((prev) => ({ ...prev, static: s.inputs.static }));
       if (s.outputs) setOutputValues(s.outputs);
       if (s.status) setFlownexStatus(s.status);
+      if (Array.isArray(s.history)) setHistory(s.history);
+      if (s.transientRunning !== undefined) setTransientRunning(Boolean(s.transientRunning));
+      if (s.connected_project !== undefined) setConnectedProject(s.connected_project || "");
+      if (s.io_directory !== undefined) setIoDirectory(s.io_directory || "");
+      return;
+    }
+
+    if (m.type === "status") {
+      setFlownexStatus(m.payload);
+      if (m.payload?.state === "error") {
+        const msg = m.payload?.message || "Backend error";
+        setErrors((prev) => [...prev.slice(-49), msg]);
+      }
       return;
     }
 
@@ -159,11 +106,6 @@ export function useBridge() {
     if (m.type === "outputs_delta") {
       const { key, value } = m.payload || {};
       if (key !== undefined) setOutputValues((prev) => ({ ...prev, [key]: value }));
-      return;
-    }
-
-    if (m.type === "status") {
-      setFlownexStatus(m.payload);
       return;
     }
   }, []); // state setters are stable
@@ -236,61 +178,76 @@ export function useBridge() {
     };
   }, [handleMessage]);
 
-  // ── Omniverse extension backend commands ───────────────────────────────────
-  const getStatus = () =>
-    send({ id: crypto.randomUUID(), command: "flownex.get_status", payload: {} });
+  // ── On (re)connect: request current state ─────────────────────────────────
+  // The backend already pushes schema + state on connect (handle_bridge_connect),
+  // so this is just a safety net for cases where the initial push is missed.
+  useEffect(() => {
+    if (!connected) return;
+    send({ type: "get_state", id: crypto.randomUUID(), payload: {} });
+  }, [connected, send]);
 
-  const getConfig = () =>
-    send({ id: crypto.randomUUID(), command: "flownex.get_config", payload: {} });
+  // ── Commands (type-based protocol matching bridge_ws_handlers.py) ──────────
 
-  const setConfigRemote = (cfg) =>
-    send({ id: crypto.randomUUID(), command: "flownex.set_config", payload: cfg || {} });
+  const getState = () =>
+    send({ type: "get_state", id: crypto.randomUUID(), payload: {} });
 
-  const loadInputs = () =>
-    send({ id: crypto.randomUUID(), command: "flownex.load_inputs", payload: {} });
-
-  const loadStaticInputs = () =>
-    send({ id: crypto.randomUUID(), command: "flownex.load_static_inputs", payload: {} });
-
-  const loadOutputs = () =>
-    send({ id: crypto.randomUUID(), command: "flownex.load_outputs", payload: {} });
-
-  const setInputValue = (key, value, scope = "dynamic") =>
+  const configure = (projectPath, ioDir, backend, opts = {}) =>
     send({
+      type: "configure",
       id: crypto.randomUUID(),
-      command: "flownex.set_input_value",
-      payload: { key, value, scope },
+      payload: {
+        projectPath: projectPath || "",
+        ioDir: ioDir || "",
+        backend: backend || "flownex",
+        ...opts,
+      },
+    });
+
+  const openFlownex = () =>
+    send({ type: "open_flownex", id: crypto.randomUUID(), payload: {} });
+
+  const openProject = () =>
+    send({ type: "open_project", id: crypto.randomUUID(), payload: {} });
+
+  const closeProject = () =>
+    send({ type: "close_project", id: crypto.randomUUID(), payload: {} });
+
+  const closeApp = () =>
+    send({ type: "close_app", id: crypto.randomUUID(), payload: {} });
+
+  // Alias so existing tabs calling bridge.closeFlownex() still work
+  const closeFlownex = closeApp;
+
+  const setInput = (scope, key, value) =>
+    send({
+      type: "set_input",
+      id: crypto.randomUUID(),
+      payload: { scope, key, value },
     });
 
   const runSteady = () =>
-    send({ id: crypto.randomUUID(), command: "flownex.run_steady", payload: {} });
+    send({ type: "run", id: crypto.randomUUID(), payload: { mode: "steady" } });
 
   const loadDefaultsAndRunSteady = () =>
-    send({
-      id: crypto.randomUUID(),
-      command: "flownex.load_defaults_and_run_steady",
-      payload: {},
-    });
+    send({ type: "load_defaults_and_run_steady", id: crypto.randomUUID(), payload: {} });
 
   const startTransient = () =>
-    send({ id: crypto.randomUUID(), command: "flownex.start_transient", payload: {} });
+    send({ type: "start_transient", id: crypto.randomUUID(), payload: {} });
 
   const stopTransient = () =>
-    send({ id: crypto.randomUUID(), command: "flownex.stop_transient", payload: {} });
+    send({ type: "stop_transient", id: crypto.randomUUID(), payload: {} });
 
-  const getResults = () =>
-    send({ id: crypto.randomUUID(), command: "flownex.get_results", payload: {} });
+  // Backward-compat alias used by CFDAnalysis (setInputValue(key, value, scope))
+  const setInputValue = (key, value, scope = "dynamic") =>
+    setInput(scope, key, value);
 
   // Custom message (for user-loaded scripts via window.__bridgeAPI)
   const sendCustom = (msgType, payload) =>
     send({
+      type: "custom",
       id: crypto.randomUUID(),
-      command: "custom",
       payload: { msgType, payload: payload || {} },
     });
-
-  // ── Backward-compat aliases (keeps existing tabs working unchanged) ─────────
-  const setInput = (scope, key, value) => setInputValue(key, value, scope);
 
   // ── Backward-compat state / schema shapes for existing tab components ──────
   const state = {
@@ -311,27 +268,30 @@ export function useBridge() {
     state,
     schema,
     flownexStatus,
-    config,
     dynamicInputDefs,
     staticInputDefs,
     outputDefs,
     inputValues,
     outputValues,
+    history,
+    transientRunning,
+    connectedProject,
+    ioDirectory,
     errors,
     send,
-    getStatus,
-    getConfig,
-    setConfigRemote,
-    loadInputs,
-    loadStaticInputs,
-    loadOutputs,
-    setInputValue,
+    getState,
+    configure,
+    openFlownex,
+    openProject,
+    closeProject,
+    closeApp,
+    closeFlownex,
     setInput,
+    setInputValue,
     runSteady,
     loadDefaultsAndRunSteady,
     startTransient,
     stopTransient,
-    getResults,
     sendCustom,
   };
   if (!window.__bridgeAPI) {
@@ -346,37 +306,36 @@ export function useBridge() {
 
     // Omniverse extension backend state
     flownexStatus,
-    config,
     dynamicInputDefs,
     staticInputDefs,
     outputDefs,
     inputValues,
     outputValues,
+    history,
+    transientRunning,
+    connectedProject,
+    ioDirectory,
     errors,
 
     // Backward-compat shapes (used by existing tab components)
     state,
     schema,
 
-    // Commands — first slice
-    getStatus,
-    getConfig,
-    setConfigRemote,
-    loadInputs,
-    loadStaticInputs,
-    loadOutputs,
-
-    // Commands — later slices (wired but not yet UI-exposed)
+    // Commands
+    send,
+    getState,
+    configure,
+    openFlownex,
+    openProject,
+    closeProject,
+    closeApp,
+    closeFlownex,
+    setInput,
     setInputValue,
     runSteady,
     loadDefaultsAndRunSteady,
     startTransient,
     stopTransient,
-    getResults,
     sendCustom,
-    send,
-
-    // Backward-compat
-    setInput,
   };
 }
