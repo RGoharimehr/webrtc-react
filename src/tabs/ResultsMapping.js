@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const ResultsMapping = ({ bridge }) => {
   const [targetPath, setTargetPath] = useState('/World');
   const [logs, setLogs] = useState('Results mapping ready.\n');
-  const fileInputRef = useRef(null);
 
   const addLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -41,44 +40,8 @@ const ResultsMapping = ({ bridge }) => {
     bridge?.sendCustom?.('generate_mapping_config', {});
   };
 
-  const onFileSelected = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const config = JSON.parse(evt.target.result);
-        addLog(`Importing project config from "${file.name}"…`);
-        bridge?.sendCustom?.('import_mapping_config', { config });
-      } catch (parseErr) {
-        addLog(`Import error — invalid JSON: ${parseErr.message}`);
-      }
-    };
-    reader.readAsText(file);
-    // Reset so the same file can be picked again
-    e.target.value = '';
-  };
-
-  const importProject = () => {
-    addLog('Opening import dialog…');
-    fileInputRef.current?.click();
-  };
-
-  const exportProject = () => {
-    addLog('Requesting project export from backend…');
-    bridge?.sendCustom?.('export_mapping_config', {});
-  };
-
   return (
     <div>
-      {/* Hidden file input for import */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        style={{ display: 'none' }}
-        onChange={onFileSelected}
-      />
 
       <div className="section">
         <div style={{
@@ -119,23 +82,6 @@ const ResultsMapping = ({ bridge }) => {
         <button className="success" onClick={generateMappingConfig}>
           Generate
         </button>
-      </div>
-
-      <div className="section">
-        <div style={{
-          borderBottom: '2px solid var(--accent-green)',
-          paddingBottom: '8px',
-          marginBottom: '16px'
-        }}>
-          <span style={{ color: 'var(--accent-green)', fontWeight: 600 }}>3.</span>
-          <span style={{ marginLeft: '8px', fontSize: '18px', fontWeight: 600 }}>
-            Project Import / Export
-          </span>
-        </div>
-        <div className="button-group">
-          <button onClick={importProject}>Import Project...</button>
-          <button onClick={exportProject}>Export Project...</button>
-        </div>
       </div>
 
       <div className="logs-container">
