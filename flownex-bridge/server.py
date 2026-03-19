@@ -97,12 +97,217 @@ async def _on_shutdown() -> None:
     await close_all()
 
 
+async def _handle_new_command(
+    ws: WebSocket,
+    local_adapter_holder: list,
+    cmd: str,
+    payload: Dict[str, Any],
+    mid: Optional[str],
+) -> None:
+    """Handle messages using the new { id, command: "flownex.*", payload } protocol.
+
+    ``local_adapter_holder`` is a one-element list so the caller's reference is
+    updated in-place when ``set_config`` changes the adapter.
+    """
+
+    async def ok(data: Dict[str, Any] = None) -> None:
+        resp: Dict[str, Any] = {"command": cmd, "status": "ok", "payload": data or {}}
+        if mid:
+            resp["id"] = mid
+        await _safe_send(ws, resp)
+
+    async def err(message: str) -> None:
+        resp: Dict[str, Any] = {"command": cmd, "status": "error", "error": message, "payload": {}}
+        if mid:
+            resp["id"] = mid
+        await _safe_send(ws, resp)
+
+    local_adapter = local_adapter_holder[0]
+
+    # ── flownex.get_status ───────────────────────────────────────────────────
+    if cmd == "flownex.get_status":
+        await ok(state.status_dict())
+        return
+
+    # ── flownex.get_config ───────────────────────────────────────────────────
+    if cmd == "flownex.get_config":
+        cfg = {
+            "project_file": state.connected_project or "",
+            "backend": state.backend,
+        }
+        await ok(cfg)
+        return
+
+    # ── flownex.set_config ───────────────────────────────────────────────────
+    if cmd == "flownex.set_config":
+        project_file = payload.get("project_file") or ""
+        io_dir       = payload.get("io_directory") or ""
+        backend      = payload.get("backend") or "flownex"
+
+        local_adapter_holder[0] = _make_adapter(backend)
+        local_adapter = local_adapter_holder[0]
+        state.backend = backend
+        state.connected_project = project_file
+
+        if io_dir:
+            inputs_csv  = os.path.join(io_dir, "Inputs.csv")
+            outputs_csv = os.path.join(io_dir, "Outputs.csv")
+            try:
+                state.load_schema_from_csv(inputs_csv, outputs_csv)
+                _set_status("idle", "Configured (schema loaded)", 1.0)
+            except Exception as exc:
+                _set_status("error", f"Configure failed: {exc}", 0.0)
+                await err(f"Configure failed: {exc}")
+                await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+                return
+
+        cfg = {
+            "project_file": state.connected_project or "",
+            "io_directory": io_dir,
+            "backend": state.backend,
+        }
+        await ok(cfg)
+        await _safe_send(ws, {"type": "schema", "payload": state.schema_dict()})
+        await _safe_send(ws, {"type": "state",  "payload": state.state_dict()})
+        await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+        return
+
+    # ── flownex.load_inputs ──────────────────────────────────────────────────
+    if cmd == "flownex.load_inputs":
+        inputs = state.schema_dict()["inputs"]
+        values = state.inputs.get("dynamic", {})
+        await ok({"inputs": inputs, "values": values})
+        return
+
+    # ── flownex.load_static_inputs ───────────────────────────────────────────
+    if cmd == "flownex.load_static_inputs":
+        inputs = state.schema_dict()["inputs"]
+        values = state.inputs.get("static", {})
+        await ok({"inputs": inputs, "values": values})
+        return
+
+    # ── flownex.load_outputs ─────────────────────────────────────────────────
+    if cmd == "flownex.load_outputs":
+        outputs = state.schema_dict()["outputs"]
+        values  = state.outputs
+        await ok({"outputs": outputs, "values": values})
+        return
+
+    # ── flownex.get_results ──────────────────────────────────────────────────
+    if cmd == "flownex.get_results":
+        await ok({"outputs": state.outputs})
+        return
+
+    # ── flownex.set_input_value ──────────────────────────────────────────────
+    if cmd == "flownex.set_input_value":
+        scope = payload.get("scope", "dynamic")
+        key   = payload.get("key", "")
+        value = payload.get("value")
+        try:
+            scope2, k2, v2 = state.set_input(scope, key, value)
+            idef = state.inputs_def.get(k2)
+            if idef:
+                local_adapter.set_property(
+                    component_identifier=idef.componentIdentifier,
+                    property_identifier=idef.propertyIdentifier,
+                    value=v2,
+                )
+            await _safe_send(ws, {"type": "inputs_delta", "payload": {"scope": scope2, "key": k2, "value": v2}})
+            await ok({"scope": scope2, "key": k2, "value": v2})
+        except Exception as exc:
+            await err(str(exc))
+        return
+
+    # ── flownex.run_steady / load_defaults_and_run_steady ───────────────────
+    if cmd in ("flownex.run_steady", "flownex.load_defaults_and_run_steady"):
+        try:
+            _set_status("running", "Running steady solve…", 0.1)
+            await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+            local_adapter.solve_steady()
+            out_map = local_adapter.read_outputs(state.outputs_def)
+            for output_key, ov in out_map.items():
+                state.set_output(output_key, ov)
+            _set_status("idle", "Solve complete", 1.0)
+            await _safe_send(ws, {"type": "state",  "payload": state.state_dict()})
+            await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+            await ok({"status": state.status_dict()})
+        except Exception as exc:
+            _set_status("error", f"Run failed: {exc}", 0.0)
+            await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+            await err(str(exc))
+        return
+
+    # ── flownex.start_transient / stop_transient ─────────────────────────────
+    if cmd in ("flownex.start_transient", "flownex.stop_transient"):
+        await ok({"message": f"{cmd} acknowledged (not implemented in dev server)"})
+        return
+
+    # ── flownex.open_flownex ─────────────────────────────────────────────────
+    if cmd == "flownex.open_flownex":
+        await ok({"message": "open_flownex acknowledged"})
+        return
+
+    # ── flownex.open_project ─────────────────────────────────────────────────
+    if cmd == "flownex.open_project":
+        try:
+            if not state.connected_project:
+                raise RuntimeError("No project configured. Call set_config first.")
+            _set_status("running", "Opening Flownex project…", 0.2)
+            await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+            local_adapter.open_project(state.connected_project)
+            _set_status("idle", "Project opened", 1.0)
+            await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+            await ok({"message": "Project opened"})
+        except Exception as exc:
+            _set_status("error", str(exc), 0.0)
+            await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+            await err(str(exc))
+        return
+
+    # ── flownex.close_project ────────────────────────────────────────────────
+    if cmd == "flownex.close_project":
+        try:
+            local_adapter.close_project()
+            _set_status("idle", "Project closed", 1.0)
+            await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+            await ok({"message": "Project closed"})
+        except Exception as exc:
+            await err(str(exc))
+        return
+
+    # ── flownex.close_flownex ────────────────────────────────────────────────
+    if cmd == "flownex.close_flownex":
+        try:
+            local_adapter.close_app()
+            _set_status("idle", "Flownex closed", 1.0)
+            await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+            await ok({"message": "Flownex closed"})
+        except Exception as exc:
+            await err(str(exc))
+        return
+
+    # ── custom (sendCustom in useBridge.js) ──────────────────────────────────
+    if cmd == "custom":
+        try:
+            msg_type    = payload.get("msgType") or "unknown"
+            msg_payload = payload.get("payload") or {}
+            result = local_adapter.send_custom(msg_type, msg_payload)
+            await ok(result)
+        except Exception as exc:
+            await err(str(exc))
+        return
+
+    # ── Unknown command ──────────────────────────────────────────────────────
+    await err(f"Unknown command: {cmd}")
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
 
-    # Each connection gets its own adapter instance (starts with default)
-    local_adapter = FlownexDirectAdapter()
+    # Each connection gets its own adapter instance (starts with default).
+    # Wrapped in a list so _handle_new_command can update it in-place.
+    local_adapter_holder = [FlownexDirectAdapter()]
 
     # send initial state (even if empty)
     await _safe_send(ws, {"type": "state", "payload": state.state_dict()})
@@ -111,9 +316,21 @@ async def ws_endpoint(ws: WebSocket):
     try:
         while True:
             msg = await ws.receive_json()
-            mtype = msg.get("type")
+            cmd   = msg.get("command")   # new protocol field
+            mtype = msg.get("type")      # old protocol field
             payload = msg.get("payload") or {}
             mid = msg.get("id")
+
+            # ── New protocol: { id, command: "flownex.*", payload } ───────────
+            # Dispatch to the dedicated handler and skip old-protocol processing.
+            if cmd and not mtype:
+                await _handle_new_command(ws, local_adapter_holder, cmd, payload, mid)
+                continue
+
+            # ── Old protocol: { type, payload } ──────────────────────────────
+            # Read adapter from holder so changes made by new-protocol calls are
+            # reflected here too.
+            local_adapter = local_adapter_holder[0]
 
             # -----------------------------
             # CONFIGURE: projectPath + ioDir + backend
@@ -125,6 +342,7 @@ async def ws_endpoint(ws: WebSocket):
 
                 # switch adapter when backend selection changes
                 local_adapter = _make_adapter(backend)
+                local_adapter_holder[0] = local_adapter
                 state.backend = backend
 
                 # build inputs/outputs schema paths from io_dir

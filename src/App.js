@@ -440,9 +440,9 @@ export default function App() {
           graphsApiRef={graphsApiRef}
         />
       ),
-      "CFD Analysis": <CFDAnalysis />,
+      "CFD Analysis": <CFDAnalysis bridge={bridge} />,
       "Configuration": <Configuration bridge={bridge} />,
-      "Results Mapping": <ResultsMapping />,
+      "Results Mapping": <ResultsMapping bridge={bridge} />,
     };
 
     return (
