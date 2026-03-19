@@ -5,30 +5,50 @@ const Configuration = ({ bridge }) => {
   // ── Flownex project fields ──────────────────────────────────────────────────
   const [projectFile, setProjectFile] = useState("");
   const [ioDirectory, setIoDirectory] = useState("");
+  const [backend, setBackend] = useState("flownex");
   const filePickerRef = useRef(null);
   const dirPickerRef  = useRef(null);
 
   const onFilePicked = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    // Use the real OS path when available (Electron / nwjs), else the file name.
+    // f.path is only available in Electron/nwjs — browsers do NOT expose the
+    // real local path for security reasons.  In a plain browser, f.path is
+    // undefined and we fall back to f.name (just the filename, NOT a full path).
+    // If you need the real path, either run this app in Electron or type the
+    // full path directly in the text box below.
     const path = f.path || f.name;
+    if (!f.path) {
+      addLog(
+        `⚠ Browser security: full path unavailable. Got filename only: "${path}". ` +
+        "Enter the full path manually or use an Electron build."
+      );
+    }
     setProjectFile(path);
-    addLog(`Project file selected: ${path}`);
+    applyProjectFieldsToConfig(path, undefined);
   };
 
   const onDirPicked = (e) => {
     const files = e.target.files;
     if (!files?.length) return;
-    // webkitRelativePath looks like "FolderName/file.csv" — grab the top folder.
-    const rel  = files[0].webkitRelativePath || "";
-    const top  = rel.split("/")[0];
-    // Use real path when available (Electron), otherwise the top-folder name.
-    const path = files[0].path
-      ? files[0].path.split(/[/\\]/).slice(0, -1).join("/")
-      : top;
+    // In Electron/nwjs, files[0].path gives the full OS path; we strip the
+    // filename to get the directory.  In a plain browser, webkitRelativePath
+    // gives "FolderName/file.csv" — we can only extract the top folder NAME,
+    // not the real absolute path.  Use the text box to enter the full path.
+    let path;
+    if (files[0].path) {
+      path = files[0].path.split(/[/\\]/).slice(0, -1).join("/");
+    } else {
+      const rel = files[0].webkitRelativePath || "";
+      path = rel.split("/")[0]; // folder name only — not a full path
+      addLog(
+        `⚠ Browser security: full directory path unavailable. ` +
+        `Got folder name only: "${path}". ` +
+        "Enter the full IO directory path manually or use an Electron build."
+      );
+    }
     setIoDirectory(path);
-    addLog(`IO folder selected: ${path}`);
+    applyProjectFieldsToConfig(undefined, path);
   };
 
   // Merge project fields into the JSON config textarea whenever they change.
@@ -45,9 +65,6 @@ const Configuration = ({ bridge }) => {
     });
     setConfigError("");
   };
-
-  // Keep project fields in sync with backend config on load.
-  // (done in the existing bridge.config useEffect below)
 
   // Local editable config mirror (populated from bridge.config on load)
   const [configText, setConfigText] = useState("");
@@ -93,6 +110,7 @@ const Configuration = ({ bridge }) => {
       // Populate project fields from backend config
       if (bridge.config.project_file  != null) setProjectFile(bridge.config.project_file);
       if (bridge.config.io_directory   != null) setIoDirectory(bridge.config.io_directory);
+      if (bridge.config.backend        != null) setBackend(bridge.config.backend);
     }
   }, [bridge?.config]);
 
@@ -150,6 +168,28 @@ const Configuration = ({ bridge }) => {
   const handleLoadOutputs = () => {
     addLog("Requesting flownex.load_outputs…");
     bridge?.loadOutputs?.();
+  };
+
+  // ── Flownex action handlers ─────────────────────────────────────────────────
+  const handleApplyConfigure = () => {
+    applyProjectFieldsToConfig(projectFile, ioDirectory);
+    addLog(`Sending configure — project: "${projectFile}", ioDir: "${ioDirectory}", backend: "${backend}"…`);
+    bridge?.configure?.(projectFile, ioDirectory, backend);
+  };
+
+  const handleOpenFlownex = () => {
+    addLog("Sending open_flownex…");
+    bridge?.openFlownex?.();
+  };
+
+  const handleOpenProject = () => {
+    addLog("Sending open_project…");
+    bridge?.openProject?.();
+  };
+
+  const handleCloseFlownex = () => {
+    addLog("Sending close_flownex…");
+    bridge?.closeFlownex?.();
   };
 
   // ── Custom extensions ───────────────────────────────────────────────────────
@@ -276,6 +316,20 @@ const Configuration = ({ bridge }) => {
             onChange={onDirPicked}
           />
 
+          {/* Backend selector */}
+          <div className="input-row" style={{ marginBottom: 10 }}>
+            <label className="input-label">Backend:</label>
+            <select
+              value={backend}
+              onChange={(e) => setBackend(e.target.value)}
+              style={{ flex: 1 }}
+            >
+              <option value="flownex">Flownex</option>
+              <option value="ansys">Ansys</option>
+              <option value="omniverse">Omniverse</option>
+            </select>
+          </div>
+
           {/* Project File */}
           <div className="input-row" style={{ marginBottom: 10 }}>
             <label className="input-label">Project File:</label>
@@ -287,19 +341,19 @@ const Configuration = ({ bridge }) => {
                   setProjectFile(e.target.value);
                   applyProjectFieldsToConfig(e.target.value, undefined);
                 }}
-                placeholder="D:\Simulation\project.fnx"
+                placeholder="D:\Simulation\project.fnx  (enter full path)"
                 style={{ flex: 1 }}
               />
               <button
                 onClick={() => filePickerRef.current?.click()}
-                title="Browse for project file"
+                title="Browse — full path only available in Electron; plain browser returns filename only"
               >
                 Browse…
               </button>
             </div>
           </div>
 
-          {/* IO Folder */}
+          {/* IO Folder (directory path, not a file) */}
           <div className="input-row" style={{ marginBottom: 10 }}>
             <label className="input-label">IO Folder:</label>
             <div style={{ flex: 1, display: "flex", gap: 6 }}>
@@ -310,12 +364,12 @@ const Configuration = ({ bridge }) => {
                   setIoDirectory(e.target.value);
                   applyProjectFieldsToConfig(undefined, e.target.value);
                 }}
-                placeholder="D:\Simulation\IOFiles"
+                placeholder="D:\Simulation\IOFiles  (enter full directory path)"
                 style={{ flex: 1 }}
               />
               <button
                 onClick={() => dirPickerRef.current?.click()}
-                title="Browse for IO folder"
+                title="Browse for IO folder — full path only available in Electron; plain browser returns folder name only"
               >
                 Browse…
               </button>
@@ -323,27 +377,46 @@ const Configuration = ({ bridge }) => {
           </div>
 
           <div style={{ color: "var(--text-secondary)", fontSize: 11, marginBottom: 8 }}>
-            Tip: use <em>Browse…</em> to pick a file/folder, or paste the full path directly.
-            Changes are reflected in the Config editor below and sent with <em>Set Config</em>.
+            ⚠ <strong>Browser limitation:</strong> the <em>Browse…</em> buttons can only
+            return the filename / folder name in a standard browser (not the full local path).
+            For a real path, type it directly in the text field, or run this app in an
+            Electron shell which provides <code>file.path</code>.
           </div>
 
-          <div className="button-group">
+          {/* Configuration workflow actions */}
+          <div className="button-group" style={{ flexWrap: "wrap", gap: 6 }}>
             <button
-              onClick={() => {
-                applyProjectFieldsToConfig(projectFile, ioDirectory);
-                try {
-                  const obj = configText.trim() ? JSON.parse(configText) : {};
-                  obj.project_file  = projectFile;
-                  obj.io_directory  = ioDirectory;
-                  addLog("Sending flownex.set_config with project paths…");
-                  bridge?.setConfigRemote?.(obj);
-                } catch (e) {
-                  setConfigError("Invalid JSON: " + e.message);
-                }
-              }}
+              title="Send configure command: sets project path, IO directory, and backend on the server"
+              onClick={handleApplyConfigure}
             >
-              Apply Project Paths
+              Apply Configure
             </button>
+            <button
+              title="Open Flownex application and load the configured project (open_flownex)"
+              onClick={handleOpenFlownex}
+            >
+              Open Flownex
+            </button>
+            <button
+              title="Open the configured project file in Flownex (open_project)"
+              onClick={handleOpenProject}
+            >
+              Open Project
+            </button>
+            <button
+              title="Close the Flownex application (close_flownex)"
+              onClick={handleCloseFlownex}
+            >
+              Close Flownex
+            </button>
+          </div>
+
+          <div style={{ color: "var(--text-secondary)", fontSize: 11, marginTop: 8 }}>
+            Workflow: enter paths → <em>Apply Configure</em> → <em>Open Flownex</em> →
+            <em> Open Project</em>. Use <em>Close Flownex</em> to shut down the application.
+            <br />
+            Note: <em>Open Flownex</em> uses the <code>open_flownex</code> backend command
+            (backed by the same adapter call as <code>open_project</code>).
           </div>
         </div>
       </div>

@@ -143,6 +143,13 @@ export function useBridge() {
         setInputValues((prev) => ({ ...prev, static: s.inputs.static }));
       if (s.outputs) setOutputValues(s.outputs);
       if (s.status) setFlownexStatus(s.status);
+      // Populate shared config with project/backend info so tabs can read it
+      setConfig((prev) => ({
+        ...(prev || {}),
+        ...(s.connected_project != null ? { project_file: s.connected_project } : {}),
+        ...(s.io_directory     != null ? { io_directory: s.io_directory }        : {}),
+        ...(s.backend          != null ? { backend: s.backend }                  : {}),
+      }));
       return;
     }
 
@@ -289,6 +296,32 @@ export function useBridge() {
       payload: { msgType, payload: payload || {} },
     });
 
+  // ── Legacy-protocol commands (matching current server.py message types) ────
+  // These use { type, payload } which the Python backend understands directly.
+
+  const configure = (projectPath, ioDir, backend) =>
+    send({
+      id: crypto.randomUUID(),
+      type: "configure",
+      payload: {
+        projectPath: projectPath || "",
+        ioDir: ioDir || "",
+        backend: backend || "flownex",
+      },
+    });
+
+  const openFlownex = () =>
+    send({ id: crypto.randomUUID(), type: "open_flownex", payload: {} });
+
+  const openProject = () =>
+    send({ id: crypto.randomUUID(), type: "open_project", payload: {} });
+
+  const closeFlownex = () =>
+    send({ id: crypto.randomUUID(), type: "close_flownex", payload: {} });
+
+  const closeProject = () =>
+    send({ id: crypto.randomUUID(), type: "close_project", payload: {} });
+
   // ── Backward-compat aliases (keeps existing tabs working unchanged) ─────────
   const setInput = (scope, key, value) => setInputValue(key, value, scope);
 
@@ -333,6 +366,11 @@ export function useBridge() {
     stopTransient,
     getResults,
     sendCustom,
+    configure,
+    openFlownex,
+    openProject,
+    closeFlownex,
+    closeProject,
   };
   if (!window.__bridgeAPI) {
     window.__bridgeAPI = bridgeAPIRef.current;
@@ -375,6 +413,13 @@ export function useBridge() {
     getResults,
     sendCustom,
     send,
+
+    // Legacy-protocol commands (matching server.py message types)
+    configure,
+    openFlownex,
+    openProject,
+    closeFlownex,
+    closeProject,
 
     // Backward-compat
     setInput,

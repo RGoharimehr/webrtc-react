@@ -414,53 +414,58 @@ export default function App() {
   // ─────────────────────────────────────────────────────────────────────────
 
   const renderTabContent = () => {
-    if (activeMode === "AI") {
-      return (
-        <div className="section">
+    // All named tab components are kept permanently mounted so their local state
+    // (form values, logs, etc.) survives switching between tabs and between modes.
+    // Only the active tab is made visible via CSS; the rest stay hidden.
+    const tabComponents = {
+      "Operating Conditions": <OperatingConditions bridge={bridge} />,
+      "Geometrical Design": <GeometricalDesign bridge={bridge} />,
+      "Results Visualization": (
+        <ResultsVisualization
+          bridge={bridge}
+          legendVar={legendVar}
+          setLegendVar={setLegendVar}
+          legendPreset={legendPreset}
+          setLegendPreset={setLegendPreset}
+          legendVariables={LEGEND_VARIABLES}
+          legendPresets={LEGEND_PRESETS}
+          effectiveMin={effectiveMin}
+          effectiveMax={effectiveMax}
+        />
+      ),
+      "Plotting": (
+        <Plotting
+          plottingVariables={plottingVariables}
+          setPlottingVariables={setPlottingVariables}
+          graphsApiRef={graphsApiRef}
+        />
+      ),
+      "CFD Analysis": <CFDAnalysis />,
+      "Configuration": <Configuration bridge={bridge} />,
+      "Results Mapping": <ResultsMapping />,
+    };
+
+    return (
+      <>
+        {/* AI mode panel */}
+        <div style={{ display: activeMode === "AI" ? "block" : "none" }} className="section">
           <h2 className="section-title">AI</h2>
           <div style={{ color: "var(--text-secondary)", fontSize: "14px" }}>
             AI workflow UI placeholder (surrogate, optimization, agent, etc.)
           </div>
         </div>
-      );
-    }
 
-    switch (activeTab) {
-      case "Operating Conditions":
-        return <OperatingConditions bridge={bridge} />;
-      case "Geometrical Design":
-        return <GeometricalDesign bridge={bridge} />;
-      case "Results Visualization":
-        return (
-          <ResultsVisualization
-            bridge={bridge}
-            legendVar={legendVar}
-            setLegendVar={setLegendVar}
-            legendPreset={legendPreset}
-            setLegendPreset={setLegendPreset}
-            legendVariables={LEGEND_VARIABLES}
-            legendPresets={LEGEND_PRESETS}
-            effectiveMin={effectiveMin}
-            effectiveMax={effectiveMax}
-          />
-        );
-      case "Plotting":
-        return (
-          <Plotting
-            plottingVariables={plottingVariables}
-            setPlottingVariables={setPlottingVariables}
-            graphsApiRef={graphsApiRef}
-          />
-        );
-      case "CFD Analysis":
-        return <CFDAnalysis />;
-      case "Configuration":
-        return <Configuration bridge={bridge} />;
-      case "Results Mapping":
-        return <ResultsMapping />;
-      default:
-        return <OperatingConditions bridge={bridge} />;
-    }
+        {/* All named tab components — only one is visible at a time */}
+        {Object.entries(tabComponents).map(([tab, component]) => (
+          <div
+            key={tab}
+            style={{ display: activeMode !== "AI" && activeTab === tab ? "block" : "none" }}
+          >
+            {component}
+          </div>
+        ))}
+      </>
+    );
   };
 
   const stopActiveStream = () => {

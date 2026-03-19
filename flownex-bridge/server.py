@@ -131,8 +131,9 @@ async def ws_endpoint(ws: WebSocket):
                 inputs_csv = os.path.join(io_dir, "Inputs.csv")
                 outputs_csv = os.path.join(io_dir, "Outputs.csv")
 
-                # store connected_project even before open
+                # store connected_project and io_directory even before open
                 state.connected_project = project_path
+                state.io_directory = io_dir
 
                 try:
                     if not os.path.isfile(inputs_csv):
@@ -173,6 +174,32 @@ async def ws_endpoint(ws: WebSocket):
 
                 except Exception as e:
                     _set_status("error", f"Open project failed: {e}", 0.0)
+                    await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+                continue
+
+            # -----------------------------
+            # OPEN FLOWNEX
+            # Launch/connect Flownex and open the configured project.
+            # Backed by the same adapter call as open_project; exposed as a
+            # distinct command so the UI can offer both "Open Flownex" and
+            # "Open Project" as separate actions.
+            # -----------------------------
+            if mtype == "open_flownex":
+                try:
+                    if not state.connected_project:
+                        raise RuntimeError("No project configured. Call configure() first.")
+
+                    _set_status("running", "Opening Flownex...", 0.2)
+                    await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+
+                    local_adapter.open_project(state.connected_project)
+
+                    _set_status("idle", "Flownex opened", 1.0)
+                    await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
+                    await _safe_send(ws, {"type": "state", "payload": state.state_dict()})
+
+                except Exception as e:
+                    _set_status("error", f"Open Flownex failed: {e}", 0.0)
                     await _safe_send(ws, {"type": "status", "payload": state.status_dict()})
                 continue
 
