@@ -438,6 +438,7 @@ export default function App() {
           plottingVariables={plottingVariables}
           setPlottingVariables={setPlottingVariables}
           graphsApiRef={graphsApiRef}
+          bridge={bridge}
         />
       ),
       "CFD Analysis": <CFDAnalysis bridge={bridge} />,

@@ -323,7 +323,7 @@ const Configuration = ({ bridge }) => {
                   setProjectFile(e.target.value);
                   applyProjectFieldsToConfig(e.target.value, undefined);
                 }}
-                placeholder="D:\Simulation\project.fnx  (enter full path)"
+                placeholder="D:\Simulation\project.flnx  (enter full path)"
                 style={{ flex: 1 }}
               />
               <button

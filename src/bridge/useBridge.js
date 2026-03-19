@@ -236,6 +236,24 @@ export function useBridge() {
     };
   }, [handleMessage]);
 
+  // ── Automatic output polling while connected ───────────────────────────────
+  // Requests the current output values every 2 seconds so the UI always
+  // reflects the latest simulation results without needing the user to
+  // manually trigger a run/refresh.
+  useEffect(() => {
+    if (!connected) return;
+
+    // Load schema definitions + initial values immediately on (re)connect
+    send({ id: crypto.randomUUID(), command: "flownex.load_outputs", payload: {} });
+    send({ id: crypto.randomUUID(), command: "flownex.get_results",  payload: {} });
+
+    const pollId = setInterval(() => {
+      send({ id: crypto.randomUUID(), command: "flownex.get_results", payload: {} });
+    }, 2000);
+
+    return () => clearInterval(pollId);
+  }, [connected, send]);
+
   // ── Omniverse extension backend commands ───────────────────────────────────
   const getStatus = () =>
     send({ id: crypto.randomUUID(), command: "flownex.get_status", payload: {} });
