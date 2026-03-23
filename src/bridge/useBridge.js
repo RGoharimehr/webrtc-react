@@ -1,341 +1,243 @@
-// src/bridge/useBridge.js
-//
-// Lightweight frontend client for the Omniverse extension backend.
-//
-// Message protocol (bridge_ws_handlers.py)
-// ─────────────────────────────────────────
-// Outgoing (frontend → backend):
-//   { type: "<command>", id: "<uuid>", payload: { … } }
-//
-// Incoming push messages (backend → frontend):
-//   { type: "schema",        payload: { inputs: [...], outputs: [...] } }
-//   { type: "state",         payload: { status, connected_project, io_directory, inputs, outputs, history, transientRunning } }
-//   { type: "status",        payload: { state, message, progress } }
-//   { type: "inputs_delta",  payload: { scope, key, value } }
-//   { type: "outputs_delta", payload: { key, value } }
+import { useEffect, useRef, useState } from "react";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+const WS_URL = "ws://127.0.0.1:8001";
 
-// Default: ws://127.0.0.1:8001  (Omniverse extension bridge WS port)
-const WS_URL =
-  process.env.REACT_APP_BACKEND_WS || "ws://127.0.0.1:8001";
-const MAX_RECONNECT_ATTEMPTS = 10;
-const BASE_RECONNECT_DELAY_MS = 1000;
-const MAX_RECONNECT_DELAY_MS = 30000;
-
-export function useBridge() {
+export function useBridge(url = WS_URL) {
   const wsRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
-  const reconnectAttemptsRef = useRef(0);
-  const isManualCloseRef = useRef(false);
-  const messageQueueRef = useRef([]);
+  const onMessageRef = useRef(null);
 
-  // ── State ──────────────────────────────────────────────────────────────────
   const [connected, setConnected] = useState(false);
+  const [state, setState] = useState({
+    schema: {
+      dynamicInputs: [],
+      staticInputs: [],
+      outputs: [],
+    },
+    inputs: {
+      dynamic: {},
+      static: {},
+    },
+    outputs: {},
+    history: [],
+    transient: {
+      running: false,
+    },
+    config: {},
+  });
 
-  // Omniverse extension backend data
-  const [flownexStatus, setFlownexStatus] = useState(null);
-  const [dynamicInputDefs, setDynamicInputDefs] = useState([]);
-  const [staticInputDefs, setStaticInputDefs] = useState([]);
-  const [outputDefs, setOutputDefs] = useState([]);
-  const [inputValues, setInputValues] = useState({ dynamic: {}, static: {} });
-  const [outputValues, setOutputValues] = useState({});
-  const [history, setHistory] = useState([]);
-  const [transientRunning, setTransientRunning] = useState(false);
-  const [connectedProject, setConnectedProject] = useState("");
-  const [ioDirectory, setIoDirectory] = useState("");
-  const [errors, setErrors] = useState([]);
-
-  // ── Low-level send ─────────────────────────────────────────────────────────
-  const send = useCallback((msg) => {
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(msg));
-    } else {
-      messageQueueRef.current.push(msg);
-    }
-  }, []);
-
-  // ── Message dispatcher ─────────────────────────────────────────────────────
-  const handleMessage = useCallback((m) => {
-    if (m.type === "schema") {
-      const incoming = m.payload || { inputs: [], outputs: [] };
-      const allInputs = incoming.inputs || [];
-      const sta = allInputs.filter((i) => i.scope === "static");
-      const dyn = allInputs.filter((i) => i.scope !== "static");
-      setDynamicInputDefs(dyn.length ? dyn : allInputs);
-      setStaticInputDefs(sta);
-      setOutputDefs(incoming.outputs || []);
-      return;
-    }
-
-    if (m.type === "state") {
-      const s = m.payload || {};
-      if (s.inputs?.dynamic)
-        setInputValues((prev) => ({ ...prev, dynamic: s.inputs.dynamic }));
-      if (s.inputs?.static)
-        setInputValues((prev) => ({ ...prev, static: s.inputs.static }));
-      if (s.outputs) setOutputValues(s.outputs);
-      if (s.status) setFlownexStatus(s.status);
-      if (Array.isArray(s.history)) setHistory(s.history);
-      if (s.transientRunning !== undefined) setTransientRunning(Boolean(s.transientRunning));
-      if (s.connected_project !== undefined) setConnectedProject(s.connected_project || "");
-      if (s.io_directory !== undefined) setIoDirectory(s.io_directory || "");
-      return;
-    }
-
-    if (m.type === "status") {
-      setFlownexStatus(m.payload);
-      if (m.payload?.state === "error") {
-        const msg = m.payload?.message || "Backend error";
-        setErrors((prev) => [...prev.slice(-49), msg]);
-      }
-      return;
-    }
-
-    if (m.type === "inputs_delta") {
-      const { scope, key, value } = m.payload || {};
-      if (scope && key !== undefined)
-        setInputValues((prev) => ({
-          ...prev,
-          [scope]: { ...(prev[scope] || {}), [key]: value },
-        }));
-      return;
-    }
-
-    if (m.type === "outputs_delta") {
-      const { key, value } = m.payload || {};
-      if (key !== undefined) setOutputValues((prev) => ({ ...prev, [key]: value }));
-      return;
-    }
-  }, []); // state setters are stable
-
-  // ── WebSocket connection with exponential back-off ─────────────────────────
   useEffect(() => {
-    isManualCloseRef.current = false;
+    let ws = null;
 
-    function connect() {
-      const ws = new WebSocket(WS_URL);
+    try {
+      ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        if (wsRef.current !== ws) return;
-        reconnectAttemptsRef.current = 0;
+        console.log("[bridge] connected:", url);
         setConnected(true);
-        const queue = messageQueueRef.current.splice(0);
-        for (const msg of queue) {
-          try {
-            ws.send(JSON.stringify(msg));
-          } catch (err) {
-            console.warn("Failed to send queued message", msg, err);
+
+        send({ type: "get_state", payload: {} });
+        send({ type: "get_schema", payload: {} });
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          console.log("[bridge] message:", msg);
+
+          if (msg.type === "state" && msg.payload) {
+            setState((prev) => {
+              const nextOutputs = msg.payload.outputs || {};
+              const hasOutputs = Object.keys(nextOutputs).length > 0;
+
+              let history = prev.history || [];
+
+              if (hasOutputs) {
+                const entry = {
+                  t: Date.now(),
+                  ...nextOutputs,
+                };
+
+                history = [...history, entry];
+                if (history.length > 500) {
+                  history = history.slice(-500);
+                }
+              }
+
+              return {
+                ...prev,
+                ...msg.payload,
+                history,
+              };
+            });
           }
+
+          if (msg.type === "response" && msg.payload) {
+            if (msg.payload.schema) {
+              setState((prev) => ({
+                ...prev,
+                schema: msg.payload.schema,
+              }));
+            }
+
+            if (msg.payload.outputs) {
+              setState((prev) => ({
+                ...prev,
+                outputs: msg.payload.outputs,
+              }));
+            }
+
+            if (msg.payload.inputs) {
+              setState((prev) => ({
+                ...prev,
+                inputs: {
+                  ...prev.inputs,
+                  ...msg.payload.inputs,
+                },
+              }));
+            }
+
+            if (msg.payload.config) {
+              setState((prev) => ({
+                ...prev,
+                config: msg.payload.config,
+              }));
+            }
+          }
+
+          if (onMessageRef.current) {
+            onMessageRef.current(msg);
+          }
+        } catch (err) {
+          console.error("[bridge] parse error:", err, event.data);
         }
+      };
+
+      ws.onerror = (err) => {
+        console.error("[bridge] websocket error:", err);
       };
 
       ws.onclose = () => {
-        if (wsRef.current !== ws) return;
+        console.warn("[bridge] disconnected");
         setConnected(false);
-        if (isManualCloseRef.current) return;
-        const attempts = reconnectAttemptsRef.current;
-        if (attempts >= MAX_RECONNECT_ATTEMPTS) {
-          console.error("WebSocket: max reconnection attempts reached.");
-          return;
-        }
-        const delay = Math.min(
-          BASE_RECONNECT_DELAY_MS * Math.pow(2, attempts),
-          MAX_RECONNECT_DELAY_MS
-        );
-        reconnectAttemptsRef.current = attempts + 1;
-        reconnectTimeoutRef.current = setTimeout(connect, delay);
       };
-
-      ws.onmessage = (ev) => {
-        let m;
-        try {
-          m = JSON.parse(ev.data);
-        } catch {
-          return;
-        }
-        handleMessage(m);
-      };
+    } catch (err) {
+      console.error("[bridge] failed to create websocket:", err);
     }
 
-    connect();
-
     return () => {
-      isManualCloseRef.current = true;
-      clearTimeout(reconnectTimeoutRef.current);
-      const ws = wsRef.current;
-      wsRef.current = null;
-      if (ws) {
-        ws.onopen = null;
-        ws.onclose = null;
-        ws.onmessage = null;
-        try {
-          ws.close();
-        } catch {}
+      try {
+        ws?.close();
+      } catch (e) {
+        console.warn("[bridge] close warning:", e);
       }
+      wsRef.current = null;
     };
-  }, [handleMessage]);
+  }, [url]);
 
-  // ── On (re)connect: request current state ─────────────────────────────────
-  // The backend already pushes schema + state on connect (handle_bridge_connect),
-  // so this is just a safety net for cases where the initial push is missed.
-  useEffect(() => {
-    if (!connected) return;
-    send({ type: "get_state", id: crypto.randomUUID(), payload: {} });
-  }, [connected, send]);
-
-  // ── Commands (type-based protocol matching bridge_ws_handlers.py) ──────────
-
-  const getState = () =>
-    send({ type: "get_state", id: crypto.randomUUID(), payload: {} });
-
-  const configure = (projectPath, ioDir, backend, opts = {}) =>
-    send({
-      type: "configure",
-      id: crypto.randomUUID(),
-      payload: {
-        projectPath: projectPath || "",
-        ioDir: ioDir || "",
-        backend: backend || "flownex",
-        ...opts,
-      },
-    });
-
-  const openFlownex = () =>
-    send({ type: "open_flownex", id: crypto.randomUUID(), payload: {} });
-
-  const openProject = () =>
-    send({ type: "open_project", id: crypto.randomUUID(), payload: {} });
-
-  const closeProject = () =>
-    send({ type: "close_project", id: crypto.randomUUID(), payload: {} });
-
-  const closeApp = () =>
-    send({ type: "close_app", id: crypto.randomUUID(), payload: {} });
-
-  // Alias so existing tabs calling bridge.closeFlownex() still work
-  const closeFlownex = closeApp;
-
-  const setInput = (scope, key, value) =>
-    send({
-      type: "set_input",
-      id: crypto.randomUUID(),
-      payload: { scope, key, value },
-    });
-
-  const runSteady = () =>
-    send({ type: "run", id: crypto.randomUUID(), payload: { mode: "steady" } });
-
-  const loadDefaultsAndRunSteady = () =>
-    send({ type: "load_defaults_and_run_steady", id: crypto.randomUUID(), payload: {} });
-
-  const startTransient = () =>
-    send({ type: "start_transient", id: crypto.randomUUID(), payload: {} });
-
-  const stopTransient = () =>
-    send({ type: "stop_transient", id: crypto.randomUUID(), payload: {} });
-
-  // Backward-compat alias used by CFDAnalysis (setInputValue(key, value, scope))
-  const setInputValue = (key, value, scope = "dynamic") =>
-    setInput(scope, key, value);
-
-  // Custom message (for user-loaded scripts via window.__bridgeAPI)
-  const sendCustom = (msgType, payload) =>
-    send({
-      type: "custom",
-      id: crypto.randomUUID(),
-      payload: { msgType, payload: payload || {} },
-    });
-
-  // ── Backward-compat state / schema shapes for existing tab components ──────
-  const state = {
-    inputs: inputValues,
-    outputs: outputValues,
-    status: flownexStatus,
+  const send = (message) => {
+    try {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        console.warn("[bridge] send skipped, socket not open:", message);
+        return;
+      }
+      wsRef.current.send(JSON.stringify(message));
+    } catch (err) {
+      console.error("[bridge] send failed:", err);
+    }
   };
-
-  const schema = {
-    inputs: [...dynamicInputDefs, ...staticInputDefs],
-    outputs: outputDefs,
-  };
-
-  // ── Expose bridge API on window for user-loaded custom scripts ─────────────
-  const bridgeAPIRef = useRef({});
-  bridgeAPIRef.current = {
-    connected,
-    state,
-    schema,
-    flownexStatus,
-    dynamicInputDefs,
-    staticInputDefs,
-    outputDefs,
-    inputValues,
-    outputValues,
-    history,
-    transientRunning,
-    connectedProject,
-    ioDirectory,
-    errors,
-    send,
-    getState,
-    configure,
-    openFlownex,
-    openProject,
-    closeProject,
-    closeApp,
-    closeFlownex,
-    setInput,
-    setInputValue,
-    runSteady,
-    loadDefaultsAndRunSteady,
-    startTransient,
-    stopTransient,
-    sendCustom,
-  };
-  if (!window.__bridgeAPI) {
-    window.__bridgeAPI = bridgeAPIRef.current;
-  } else {
-    Object.assign(window.__bridgeAPI, bridgeAPIRef.current);
-  }
 
   return {
-    // Connection
     connected,
-
-    // Omniverse extension backend state
-    flownexStatus,
-    dynamicInputDefs,
-    staticInputDefs,
-    outputDefs,
-    inputValues,
-    outputValues,
-    history,
-    transientRunning,
-    connectedProject,
-    ioDirectory,
-    errors,
-
-    // Backward-compat shapes (used by existing tab components)
     state,
-    schema,
-
-    // Commands
     send,
-    getState,
-    configure,
-    openFlownex,
-    openProject,
-    closeProject,
-    closeApp,
-    closeFlownex,
-    setInput,
-    setInputValue,
-    runSteady,
-    loadDefaultsAndRunSteady,
-    startTransient,
-    stopTransient,
-    sendCustom,
+
+    configure(projectFile, ioDirectory, resultPollingInterval = 1.0) {
+      send({
+        type: "configure",
+        payload: {
+          projectFile,
+          ioDirectory,
+          resultPollingInterval,
+        },
+      });
+    },
+
+    openFlownex() {
+      send({ type: "open_flownex", payload: {} });
+    },
+
+    closeFlownex() {
+      send({ type: "close_flownex", payload: {} });
+    },
+
+    openProject() {
+      send({ type: "open_project", payload: {} });
+    },
+
+    connectFlownex() {
+      send({ type: "connect", payload: {} });
+    },
+
+    runSteady() {
+      send({ type: "run", payload: {} });
+    },
+
+    loadDefaults() {
+      send({ type: "load_defaults", payload: {} });
+    },
+
+    loadDefaultsAndRun() {
+      send({ type: "load_defaults_and_run", payload: {} });
+    },
+
+    startTransient() {
+      send({ type: "start_transient", payload: {} });
+    },
+
+    stopTransient() {
+      send({ type: "stop_transient", payload: {} });
+    },
+
+    readOutputs() {
+      send({ type: "read_outputs", payload: {} });
+    },
+
+    getSchema() {
+      send({ type: "get_schema", payload: {} });
+    },
+
+    getStateSnapshot() {
+      send({ type: "get_state", payload: {} });
+    },
+
+    setInput(scope, key, value) {
+      send({
+        type: "set_input",
+        payload: { scope, key, value },
+      });
+    },
+
+    visualize(property) {
+      send({
+        type: "visualize_property",
+        payload: { property },
+      });
+    },
+
+    browseFile(mode = "file", filters = []) {
+      send({
+        type: "browse_file",
+        payload: { mode, filters },
+      });
+    },
+
+    set onMessage(fn) {
+      onMessageRef.current = fn;
+    },
+
+    get onMessage() {
+      return onMessageRef.current;
+    },
   };
 }

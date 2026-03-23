@@ -1,108 +1,64 @@
-import React from 'react';
-import AppStream from '../components/AppStream';
+import React, { useMemo, useState } from "react";
 
-const ResultsVisualization = ({
-  bridge,
-  legendVar,
-  setLegendVar,
-  legendPreset,
-  setLegendPreset,
-  legendVariables,
-  legendPresets,
-  effectiveMin,
-  effectiveMax,
-}) => {
-  const outputs = bridge?.state?.outputs || {};
+export default function ResultsVisualization({ bridge, state }) {
+  const outputs = state?.schema?.outputs || [];
+  const currentOutputs = state?.outputs || {};
+  const [selectedProperty, setSelectedProperty] = useState("");
 
-  const selectedVarObj = legendVariables.find((v) => v.id === legendVar) || legendVariables[0];
-  const selectedPresetObj = legendPresets.find((p) => p.id === legendPreset) || legendPresets[0];
+  const outputOptions = useMemo(() => {
+    return outputs.map((o) => ({
+      key: o.key || o.propertyIdentifier || o.label,
+      label: o.label || o.key || o.propertyIdentifier || "Unnamed Output",
+    }));
+  }, [outputs]);
 
-  const applyVisualization = () => {
-    const msg = JSON.stringify({
-      event_type: "colorize",
-      payload: {
-        property: selectedVarObj.id,
-        colormap: legendPreset,
-        min: effectiveMin,
-        max: effectiveMax,
-      },
-    });
-    AppStream.sendMessage(msg);
+  const handleVisualize = () => {
+    if (!selectedProperty) {
+      alert("Select a property first");
+      return;
+    }
+
+    bridge?.visualize?.(selectedProperty);
   };
 
-  // The gradient presets are stored as vertical (180deg) for the sidebar legend bar.
-  // The preview bar here is horizontal, so we rotate the direction to 90deg.
-  const horizontalGradient = selectedPresetObj.gradient.replaceAll('180deg', '90deg');
-
   return (
-    <div>
-      <div className="section">
-        <h2 className="section-title">Visualization Property</h2>
-        <div className="input-row">
-          <label className="input-label">Property:</label>
-          <select
-            style={{ flex: 1 }}
-            value={legendVar}
-            onChange={(e) => setLegendVar(e.target.value)}
-          >
-            {legendVariables.map((v) => {
-              const rawVal = outputs[v.id];
-              const numVal = typeof rawVal === 'number' ? rawVal : parseFloat(rawVal);
-              const suffix = rawVal != null && Number.isFinite(numVal)
-                ? ` — ${numVal.toFixed(2)} ${v.units}`
-                : ` (${v.min}–${v.max} ${v.units})`;
-              return (
-                <option key={v.id} value={v.id}>{v.label}{suffix}</option>
-              );
-            })}
-          </select>
-        </div>
+    <div style={{ padding: "16px" }}>
+      <h2>Results Visualization</h2>
+
+      <div style={{ marginBottom: "20px" }}>
+        <label>Select Property:</label>
+        <br />
+        <select
+          value={selectedProperty}
+          onChange={(e) => setSelectedProperty(e.target.value)}
+          style={{ width: "280px", marginTop: "8px" }}
+        >
+          <option value="">-- Select --</option>
+          {outputOptions.map((o) => (
+            <option key={o.key} value={o.key}>
+              {o.label}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <div className="section">
-        <h2 className="section-title">Color Map</h2>
-        <div className="input-row">
-          <label className="input-label">Colormap:</label>
-          <select
-            style={{ flex: 1 }}
-            value={legendPreset}
-            onChange={(e) => setLegendPreset(e.target.value)}
-          >
-            {legendPresets.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{
-          height: '36px',
-          background: horizontalGradient,
-          backgroundSize: '100% 100%',
-          borderRadius: '8px',
-          position: 'relative',
-          marginTop: '8px',
-          marginBottom: '8px',
-        }}>
-          <span style={{
-            position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)',
-            fontSize: '11px', background: 'rgba(0,0,0,0.65)', padding: '2px 5px', borderRadius: '4px',
-          }}>
-            {effectiveMin} {selectedVarObj.units}
-          </span>
-          <span style={{
-            position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
-            fontSize: '11px', background: 'rgba(0,0,0,0.65)', padding: '2px 5px', borderRadius: '4px',
-          }}>
-            {effectiveMax} {selectedVarObj.units}
-          </span>
-        </div>
+      <div style={{ marginBottom: "24px" }}>
+        <button onClick={handleVisualize}>Apply Colormap</button>
       </div>
 
-      <button className="success" onClick={applyVisualization} style={{ width: '100%' }}>
-        Apply to Omniverse
-      </button>
+      <div>
+        <h3>Current Results</h3>
+        {outputOptions.length ? (
+          outputOptions.map((o) => (
+            <div key={o.key} style={{ marginBottom: "8px" }}>
+              <strong>{o.label}:</strong>{" "}
+              {currentOutputs[o.key] !== undefined ? String(currentOutputs[o.key]) : "—"}
+            </div>
+          ))
+        ) : (
+          <div style={{ opacity: 0.75 }}>No output schema available yet.</div>
+        )}
+      </div>
     </div>
   );
-};
-
-export default ResultsVisualization;
+}

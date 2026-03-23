@@ -436,11 +436,16 @@ export default function App() {
     // (form values, logs, etc.) survives switching between tabs and between modes.
     // Only the active tab is made visible via CSS; the rest stay hidden.
     const tabComponents = {
-      "Operating Conditions": <OperatingConditions bridge={bridge} />,
-      "Geometrical Design": <GeometricalDesign bridge={bridge} />,
+      "Operating Conditions": (
+        <OperatingConditions bridge={bridge} state={bridge.state} />
+      ),
+      "Geometrical Design": (
+        <GeometricalDesign bridge={bridge} state={bridge.state} />
+      ),
       "Results Visualization": (
         <ResultsVisualization
           bridge={bridge}
+          state={bridge.state}
           legendVar={legendVar}
           setLegendVar={setLegendVar}
           legendPreset={legendPreset}

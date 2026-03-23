@@ -1,250 +1,42 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 
-const DEFAULTS = {
-  serverHeight: 2.0,
-  serverWidth: 0.6,
-  serverDepth: 1.0,
-  aisleWidth: 1.5,
-  ceilingHeight: 3.0,
-  rackCount: 20,
-};
+export default function GeometricalDesign({ bridge, state }) {
 
-const GeometricalDesign = ({ bridge }) => {
-  const [geometry, setGeometry] = useState(DEFAULTS);
+  const staticInputs = state?.schema?.staticInputs || [];
 
-  // Schema-driven static inputs from backend
-  const staticDefs = bridge?.staticInputDefs || [];
-  const staticValues = bridge?.state?.inputs?.static || {};
-
-  // ---- Debounce bridge sends (prevents spam while dragging) ----
-  const pendingRef = useRef({});
-  const flushTimerRef = useRef(null);
-
-  const flushPending = () => {
-    const pending = pendingRef.current;
-    pendingRef.current = {};
-    flushTimerRef.current = null;
-
-    try {
-      for (const [k, v] of Object.entries(pending)) {
-        bridge?.setInput?.("static", k, v);
+  const handleChange = (key, value) => {
+    bridge?.send?.({
+      type: "set_input",
+      payload: {
+        scope: "static",
+        key,
+        value: Number(value)
       }
-    } catch (e) {
-      console.warn("Bridge setInput failed:", e);
-    }
-  };
-
-  const scheduleFlush = () => {
-    if (flushTimerRef.current) return;
-    flushTimerRef.current = setTimeout(flushPending, 120); // tweak 80–200ms
-  };
-
-  // Cleanup debounce timer
-  useEffect(() => {
-    return () => {
-      if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
-    };
-  }, []);
-
-  // ---- Pull backend snapshot -> update UI ----
-  useEffect(() => {
-    const backendStatic = bridge?.state?.inputs?.static;
-    if (!backendStatic) return;
-
-    setGeometry((prev) => {
-      let changed = false;
-      const next = { ...prev };
-
-      for (const key of Object.keys(DEFAULTS)) {
-        const incoming = backendStatic[key];
-        if (incoming === undefined || incoming === null) continue;
-
-        const normalized =
-          key === "rackCount" ? parseInt(incoming, 10) : parseFloat(incoming);
-
-        if (Number.isFinite(normalized) && next[key] !== normalized) {
-          next[key] = normalized;
-          changed = true;
-        }
-      }
-
-      return changed ? next : prev;
     });
-  }, [bridge?.state?.inputs?.static]);
-
-  const handleGeometryChange = (param, rawValue) => {
-    const value =
-      param === "rackCount" ? parseInt(rawValue, 10) : parseFloat(rawValue);
-
-    setGeometry((prev) => ({ ...prev, [param]: value }));
-
-    // queue update, flush with debounce
-    pendingRef.current[param] = value;
-    scheduleFlush();
   };
+
+  if (!staticInputs.length) {
+    return <div style={{ padding: "16px" }}>No geometrical inputs available.</div>;
+  }
 
   return (
-    <div>
-      <div className="section">
-        <h2 className="section-title">Geometric Parameters</h2>
+    <div style={{ padding: "16px" }}>
+      <h2>Geometrical Design</h2>
 
-        {/* ── Schema-driven static inputs (when backend provides them) ── */}
-        {staticDefs.length > 0 && staticDefs.map((i) => {
-          const editType = (i.editType || "slider").toLowerCase();
-          const rawVal = staticValues[i.key] ?? i.defaultValue ?? 0;
+      {staticInputs.map((input) => (
+        <div key={input.key} style={{ marginBottom: "12px" }}>
+          <label style={{ display: "block", marginBottom: "4px" }}>
+            {input.label || input.key}
+          </label>
 
-          if (editType === "checkbox") {
-            const checked = Boolean(rawVal);
-            return (
-              <div key={i.key} className="input-row">
-                <label className="input-label">
-                  {i.description} {i.unit ? `[${i.unit}]` : ""}
-                </label>
-                <div className="input-control">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => {
-                      pendingRef.current[i.key] = e.target.checked;
-                      scheduleFlush();
-                    }}
-                  />
-                  <span className="value-display">{checked ? "On" : "Off"}</span>
-                </div>
-              </div>
-            );
-          }
-
-          const v = typeof rawVal === "number" ? rawVal : parseFloat(rawVal) || 0;
-          return (
-            <div key={i.key} className="input-row">
-              <label className="input-label">
-                {i.description} {i.unit ? `[${i.unit}]` : ""}
-              </label>
-              <div className="input-control">
-                <input
-                  type="range"
-                  min={i.min ?? 0}
-                  max={i.max ?? 100}
-                  step={i.step ?? 1}
-                  value={v}
-                  onChange={(e) => {
-                    pendingRef.current[i.key] = Number(e.target.value);
-                    scheduleFlush();
-                  }}
-                />
-                <span className="value-display">{v} {i.unit}</span>
-              </div>
-              <div style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>
-                <div><b>Key:</b> {i.key}</div>
-              </div>
-            </div>
-          );
-        })}
-
-        {/* ── Fallback hardcoded inputs (shown when no schema is available) ── */}
-        {staticDefs.length === 0 && (
-          <>
-            <div className="input-row">
-              <label className="input-label">Server Height [m]:</label>
-              <div className="input-control">
-                <input
-                  type="range"
-                  min="1.0"
-                  max="3.0"
-                  step="0.1"
-                  value={geometry.serverHeight}
-                  onChange={(e) => handleGeometryChange("serverHeight", e.target.value)}
-                />
-                <span className="value-display">{geometry.serverHeight} m</span>
-              </div>
-            </div>
-
-            <div className="input-row">
-              <label className="input-label">Server Width [m]:</label>
-              <div className="input-control">
-                <input
-                  type="range"
-                  min="0.3"
-                  max="1.0"
-                  step="0.05"
-                  value={geometry.serverWidth}
-                  onChange={(e) => handleGeometryChange("serverWidth", e.target.value)}
-                />
-                <span className="value-display">{geometry.serverWidth} m</span>
-              </div>
-            </div>
-
-            <div className="input-row">
-              <label className="input-label">Server Depth [m]:</label>
-              <div className="input-control">
-                <input
-                  type="range"
-                  min="0.5"
-                  max="1.5"
-                  step="0.1"
-                  value={geometry.serverDepth}
-                  onChange={(e) => handleGeometryChange("serverDepth", e.target.value)}
-                />
-                <span className="value-display">{geometry.serverDepth} m</span>
-              </div>
-            </div>
-
-            <div className="input-row">
-              <label className="input-label">Aisle Width [m]:</label>
-              <div className="input-control">
-                <input
-                  type="range"
-                  min="0.8"
-                  max="3.0"
-                  step="0.1"
-                  value={geometry.aisleWidth}
-                  onChange={(e) => handleGeometryChange("aisleWidth", e.target.value)}
-                />
-                <span className="value-display">{geometry.aisleWidth} m</span>
-              </div>
-            </div>
-
-            <div className="input-row">
-              <label className="input-label">Ceiling Height [m]:</label>
-              <div className="input-control">
-                <input
-                  type="range"
-                  min="2.5"
-                  max="5.0"
-                  step="0.1"
-                  value={geometry.ceilingHeight}
-                  onChange={(e) => handleGeometryChange("ceilingHeight", e.target.value)}
-                />
-                <span className="value-display">{geometry.ceilingHeight} m</span>
-              </div>
-            </div>
-
-            <div className="input-row">
-              <label className="input-label">Number of Racks:</label>
-              <div className="input-control">
-                <input
-                  type="range"
-                  min="5"
-                  max="50"
-                  step="1"
-                  value={geometry.rackCount}
-                  onChange={(e) => handleGeometryChange("rackCount", e.target.value)}
-                />
-                <span className="value-display">{geometry.rackCount}</span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* small connection indicator */}
-        <div style={{ fontSize: 12, opacity: 0.85, marginTop: 10 }}>
-          Bridge: {bridge?.connected ? "Connected" : "Disconnected"}
+          <input
+            type="number"
+            value={state?.inputs?.static?.[input.key] ?? input.default ?? 0}
+            onChange={(e) => handleChange(input.key, e.target.value)}
+            style={{ width: "150px" }}
+          />
         </div>
-      </div>
-
+      ))}
     </div>
   );
-};
-
-export default GeometricalDesign;
+}
