@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import GraphsPanel from "../components/GraphsPanel";
 
 export default function Plotting({ bridge, state }) {
@@ -12,6 +12,16 @@ export default function Plotting({ bridge, state }) {
       label: out.label || out.key || out.propertyIdentifier || "Unnamed Output",
     }));
   }, [outputs]);
+
+  useEffect(() => {
+    if (!bridge?.connected) return;
+
+    const interval = setInterval(() => {
+      bridge.readOutputs?.();
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [bridge?.connected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleVar = (key) => {
     setSelectedVars((prev) =>

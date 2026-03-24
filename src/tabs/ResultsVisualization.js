@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 export default function ResultsVisualization({ bridge, state }) {
   const outputs = state?.schema?.outputs || [];
@@ -11,6 +11,22 @@ export default function ResultsVisualization({ bridge, state }) {
       label: o.label || o.key || o.propertyIdentifier || "Unnamed Output",
     }));
   }, [outputs]);
+
+  useEffect(() => {
+    if (!bridge || !selectedProperty) return;
+
+    const handler = (msg) => {
+      if (msg.type === "state_update") {
+        bridge.visualize?.(selectedProperty);
+      }
+    };
+
+    bridge.onMessage = handler;
+
+    return () => {
+      bridge.onMessage = null;
+    };
+  }, [selectedProperty, bridge]);
 
   const handleVisualize = () => {
     if (!selectedProperty) {

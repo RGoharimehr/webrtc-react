@@ -64,11 +64,20 @@ export function useBridge(url = WS_URL) {
                 }
               }
 
-              return {
+              const nextState = {
                 ...prev,
                 ...msg.payload,
                 history,
               };
+
+              if (onMessageRef.current) {
+                onMessageRef.current({
+                  type: "state_update",
+                  state: nextState,
+                });
+              }
+
+              return nextState;
             });
           }
 
@@ -105,7 +114,7 @@ export function useBridge(url = WS_URL) {
             }
           }
 
-          if (onMessageRef.current) {
+          if (onMessageRef.current && msg.type !== "state") {
             onMessageRef.current(msg);
           }
         } catch (err) {
